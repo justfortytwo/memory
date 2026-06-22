@@ -1,0 +1,14 @@
+{
+  "//": "Registers the standalone memory MCP server. Default command runs the published package via npx. ALT (when developing this plugin from source, after `npm run build`): set command to 'node' and args to ['${CLAUDE_PLUGIN_ROOT}/dist/index.js']. ${CLAUDE_PLUGIN_DATA} survives plugin updates, so the DB persists across upgrades.",
+  "mcpServers": {
+    "fortytwo-memory": {
+      "command": "npx",
+      "args": ["-y", "@justfortytwo/memory"],
+      "env": {
+        "OLLAMA_BASE_URL": "http://localhost:11434",
+        "EMBED_MODEL": "qwen3-embedding:0.6b",
+        "DB_PATH": "${CLAUDE_PLUGIN_DATA}/memory.db"
+      }
+    }
+  }
+}
