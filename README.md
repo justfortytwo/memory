@@ -173,3 +173,7 @@ Set `RUN_OLLAMA_TESTS=1` to run the opt-in live-Ollama embedder test.
 ## License
 
 MIT © 2026 justfortytwo
+
+---
+
+Created and maintained by [**Enrico Deleo**](https://enricodeleo.com).
