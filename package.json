@@ -1,5 +1,5 @@
 {
-  "name": "@justfortytwo/memory",
+  "name": "@justfortytwo/guide",
   "version": "0.1.0",
   "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). Ford-agnostic.",
   "license": "MIT",
@@ -7,7 +7,7 @@
   "type": "module",
   "engines": { "node": ">=18" },
   "bin": {
-    "fortytwo-memory": "dist/index.js"
+    "fortytwo-guide": "dist/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -32,6 +32,14 @@
     "better-sqlite3": "^11.0.0",
     "knex": "^3.1.0",
     "sqlite-vec": "^0.1.6"
+  },
+  "peerDependencies": {
+    "@justfortytwo/vogon": "^0.1.0",
+    "@justfortytwo/deepthought": "^0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "@justfortytwo/vogon": { "optional": true },
+    "@justfortytwo/deepthought": { "optional": true }
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",

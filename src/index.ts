@@ -14,9 +14,9 @@ import { toolDefinitions } from './tools.js';
 import {
   store, query, recall, recallDocs, lexical, reindex, exportRange,
 } from './memory.js';
-import { MEMORY_SERVER_ID } from './contract.js';
+import { GUIDE_SERVER_ID } from './contract.js';
 
-// Public surface re-exports so consumers can `import { ... } from '@justfortytwo/memory'`.
+// Public surface re-exports so consumers can `import { ... } from '@justfortytwo/guide'`.
 export * from './contract.js';
 export * from './embedder.js';
 export { openDb, type DbHandles, EMBED_DIM } from './db.js';
@@ -28,6 +28,8 @@ export {
 } from './memory.js';
 export { enrich, enrichFromTurn, type EnrichmentCandidate, type EnrichmentResult } from './enrichment.js';
 export { toolDefinitions } from './tools.js';
+// guide's implementation of vogon's ApprovalStore + AuditLogger seam (guide -> vogon).
+export { VogonApprovalStore } from './vogon-approval-store.js';
 
 // Standalone, Ford-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
 const DB_PATH = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve('memory.db');
@@ -43,7 +45,7 @@ const h = openDb(DB_PATH);
 await runMigrations(h.k);
 
 const server = new Server(
-  { name: MEMORY_SERVER_ID, version: '0.1.0' },
+  { name: GUIDE_SERVER_ID, version: '0.1.0' },
   { capabilities: { tools: {} } },
 );
 

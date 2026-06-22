@@ -1,6 +1,13 @@
 import type { DbHandles } from './db.js';
 import type { Embedder } from './embedder.js';
 import { recall, store, type MemoryInput, type RecallRow } from './memory.js';
+// TODO(wire): the salience extractor lives in the @justfortytwo/deepthought peer.
+//   import type { SalienceExtractor, Turn } from '@justfortytwo/deepthought';
+// Local mirrors of deepthought's surface so this file type-checks before the peer
+// is installed. The Candidate shape is intentionally identical to EnrichmentCandidate.
+interface SalienceExtractor {
+  extractSalient(turn: { text: string; source?: string; observed?: string; date?: string; meta?: Record<string, unknown> }): Promise<EnrichmentCandidate[]>;
+}
 
 // ===========================================================================
 // Continuous enrichment — STUB.
@@ -18,11 +25,12 @@ import { recall, store, type MemoryInput, type RecallRow } from './memory.js';
 //      keeping ("the owner's child is named X", "the deploy script lives at Y").
 //      Each candidate carries a salience score; below a threshold we drop it so
 //      the store does not fill with noise.
-//      TODO(impl): the extractor is model-driven. The LLM call itself is NOT
-//        owned by this package (a memory server must not embed a model client).
-//        TODO(extract): the turn-summariser / salience scorer belongs in a
-//        sibling package — reference as `@justfortytwo/cognition` (or similar)
-//        and pass candidates IN to enrich(). This file owns only dedupe + write.
+//      The extractor is model-driven, and the LLM call is NOT owned by this
+//      package (a memory server must not embed a model client). The salience
+//      step lives in the sibling `@justfortytwo/deepthought` engine, which
+//      defines a `SalienceExtractor` (injected `LlmClient`) and returns scored
+//      candidates. We inject that extractor and pass its candidates IN to
+//      enrich(); this file owns only dedupe + write.
 //
 //   2. DEDUPE / SUPERSEDE  (recency wins, history is kept, NEVER overwrite)
 //      For each candidate, semantically recall the nearest existing memories.
@@ -35,7 +43,7 @@ import { recall, store, type MemoryInput, type RecallRow } from './memory.js';
 //            Recency wins for live recall; nothing is deleted.
 //      TODO(impl): "same meaning" vs "contradiction" needs more than vector
 //        distance (two close vectors can be opposite facts). This likely needs
-//        the same sibling cognition step as (1) to judge the relation.
+//        the same sibling deepthought step as (1) to judge the relation.
 //
 //   3. WRITE  (tagged provenance)
 //      Persist surviving candidates via memory.store, tagged with:
@@ -96,15 +104,21 @@ export async function enrich(
 
 /**
  * Post-turn entry point: extract salient candidates from a turn, then enrich.
- * The extraction step is delegated to a sibling cognition package.
+ *
+ * The extraction step is delegated to the sibling @justfortytwo/deepthought
+ * engine via an INJECTED SalienceExtractor — guide owns dedupe + write, never the
+ * model client. The host builds the extractor (deepthought's createSalienceExtractor
+ * with its own LlmClient) and passes it in here.
  */
 export async function enrichFromTurn(
   _h: DbHandles,
   _embedder: Embedder,
   _turn: { text: string; source?: string },
+  _extractor: SalienceExtractor,
 ): Promise<EnrichmentResult> {
-  // TODO(extract): const candidates = await import('@justfortytwo/cognition')
-  //   .then((c) => c.extractSalientMemories(_turn));
+  // TODO(wire): const candidates = await _extractor.extractSalient(_turn);
+  //   (the extractor is @justfortytwo/deepthought's, with an injected LlmClient)
   // TODO(impl): return enrich(_h, _embedder, candidates);
-  throw new Error('enrichment.enrichFromTurn is a stub — see TODO(extract) in enrichment.ts');
+  void _extractor;
+  throw new Error('enrichment.enrichFromTurn is a stub — see TODO(wire) in enrichment.ts');
 }
