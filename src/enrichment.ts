@@ -1,6 +1,6 @@
 import type { DbHandles } from './db.js';
 import type { Embedder } from './embedder.js';
-import { recall, store, type MemoryInput, type RecallRow } from './memory.js';
+import { recall, store } from './memory.js';
 // TODO(wire): the salience extractor lives in the @justfortytwo/deepthought peer.
 //   import type { SalienceExtractor, Turn } from '@justfortytwo/deepthought';
 // Local mirrors of deepthought's surface so this file type-checks before the peer
@@ -72,6 +72,13 @@ export interface EnrichmentCandidate {
   date?: string;
   tags?: string[];
   meta?: Record<string, unknown>;
+  /**
+   * If set, this candidate supersedes the given memory id — an upstream
+   * contradiction/update judgment (e.g. from the deepthought salience step).
+   * enrich() honors it: the new row is written and the old row is flagged
+   * superseded (history kept, never overwritten), even past the dedupe check.
+   */
+  supersedes?: number | null;
 }
 
 export interface EnrichmentResult {
@@ -88,18 +95,42 @@ export interface EnrichmentResult {
  * only — it does not call any model.
  */
 export async function enrich(
-  _h: DbHandles,
-  _embedder: Embedder,
-  _candidates: EnrichmentCandidate[],
+  h: DbHandles,
+  embedder: Embedder,
+  candidates: EnrichmentCandidate[],
 ): Promise<EnrichmentResult> {
-  // TODO(impl): implement the dedupe/supersede/write loop described above.
-  //   for each candidate where salience >= SALIENCE_THRESHOLD:
-  //     const near = await recall(_h, _embedder, candidate.content, 5);
-  //     decide skip | write | write-and-supersede (see (2));
-  //     await store(_h, _embedder, { ...candidate, supersedes });
-  // Wired against memory.recall / memory.store; left unimplemented on purpose.
-  void recall; void store; void ({} as MemoryInput); void ({} as RecallRow);
-  throw new Error('enrichment.enrich is a stub — see TODO(impl) in enrichment.ts');
+  const written: number[] = [];
+  const superseded: number[] = [];
+  let skipped = 0;
+
+  for (const c of candidates) {
+    if (c.salience < SALIENCE_THRESHOLD) {
+      skipped++;
+      continue;
+    }
+    // Dedupe by meaning — unless the candidate explicitly supersedes a prior row,
+    // in which case the update is intentional even if it reads similar.
+    if (c.supersedes == null) {
+      const near = await recall(h, embedder, c.content, 1);
+      if (near.length > 0 && near[0].distance < DEDUPE_DISTANCE) {
+        skipped++;
+        continue;
+      }
+    }
+    const id = await store(h, embedder, {
+      content: c.content,
+      source: c.source,
+      observed: c.observed,
+      date: c.date,
+      tags: c.tags,
+      meta: c.meta,
+      supersedes: c.supersedes ?? null,
+    });
+    written.push(id);
+    if (c.supersedes != null) superseded.push(c.supersedes);
+  }
+
+  return { written, superseded, skipped };
 }
 
 /**
@@ -111,14 +142,13 @@ export async function enrich(
  * with its own LlmClient) and passes it in here.
  */
 export async function enrichFromTurn(
-  _h: DbHandles,
-  _embedder: Embedder,
-  _turn: { text: string; source?: string },
-  _extractor: SalienceExtractor,
+  h: DbHandles,
+  embedder: Embedder,
+  turn: { text: string; source?: string },
+  extractor: SalienceExtractor,
 ): Promise<EnrichmentResult> {
-  // TODO(wire): const candidates = await _extractor.extractSalient(_turn);
-  //   (the extractor is @justfortytwo/deepthought's, with an injected LlmClient)
-  // TODO(impl): return enrich(_h, _embedder, candidates);
-  void _extractor;
-  throw new Error('enrichment.enrichFromTurn is a stub — see TODO(wire) in enrichment.ts');
+  // guide owns dedupe + write; the salience extraction (the model call) is the
+  // injected @justfortytwo/deepthought engine's. We only wire the two together.
+  const candidates = await extractor.extractSalient(turn);
+  return enrich(h, embedder, candidates);
 }

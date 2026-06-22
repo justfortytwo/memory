@@ -138,14 +138,18 @@ upgrades. When developing from source, build first (`npm run build`) and swap
 the command to `node` with args `["${CLAUDE_PLUGIN_ROOT}/dist/index.js"]`.
 Claude Code does **not** build MCP servers — they run via npm/npx.
 
-## Continuous enrichment (planned)
+## Continuous enrichment
 
-`src/enrichment.ts` is a **stub** for post-turn memory curation: salient-memory
-extraction → dedupe/**supersede** (recency wins, history kept, never a silent
-overwrite) → write with provenance. The salience extractor is model-driven and
-lives in the sibling **`@justfortytwo/deepthought`** engine (a `SalienceExtractor`
-with an injected `LlmClient`); guide injects it and owns only the dedupe + write.
-See the design notes and `TODO(impl)` / `TODO(wire)` markers in that file.
+`enrich(h, embedder, candidates)` folds a batch of candidate memories into the
+store: it drops low-salience candidates, **dedupes** near-duplicates by meaning,
+and writes the survivors with provenance — honoring an explicit `supersedes` to
+replace a stale belief (history is kept, never a silent overwrite).
+`enrichFromTurn(h, embedder, turn, extractor)` runs an injected `SalienceExtractor`
+and feeds its candidates to `enrich`.
+
+The salience extractor itself is model-driven and lives in the sibling
+**`@justfortytwo/deepthought`** engine (a `SalienceExtractor` with an injected
+`LlmClient`) — guide owns only the dedupe + write, never the model call.
 
 ## Peer seams
 

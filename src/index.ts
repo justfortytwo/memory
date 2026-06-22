@@ -11,9 +11,7 @@ import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
 import { FakeEmbedder, OllamaEmbedder, type Embedder } from './embedder.js';
 import { toolDefinitions } from './tools.js';
-import {
-  store, query, recall, recallDocs, lexical, reindex, exportRange,
-} from './memory.js';
+import { callTool } from './dispatch.js';
 import { GUIDE_SERVER_ID } from './contract.js';
 
 // Public surface re-exports so consumers can `import { ... } from '@justfortytwo/guide'`.
@@ -55,49 +53,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
 
 server.setRequestHandler(CallToolRequestSchema, async (req) => {
   const { name, arguments: args = {} } = req.params;
-  const a = args as Record<string, unknown>;
-  let result: unknown;
-  switch (name) {
-    case 'store':
-      result = await store(h, embedder, {
-        content: String(a.content),
-        source: a.source as string | undefined,
-        observed: a.observed as string | undefined,
-        date: a.date as string | undefined,
-        tags: Array.isArray(a.tags) ? (a.tags as string[]) : undefined,
-        meta: a.meta as Record<string, unknown> | undefined,
-        supersedes: a.supersedes as number | undefined,
-      });
-      break;
-    case 'query':
-      result = await query(h, {
-        source: a.source as string | undefined,
-        observed: a.observed as string | undefined,
-        tag: a.tag as string | undefined,
-        since: a.since as string | undefined,
-        until: a.until as string | undefined,
-        liveOnly: a.live_only as boolean | undefined,
-        limit: a.limit as number | undefined,
-      });
-      break;
-    case 'recall':
-      result = await recall(h, embedder, String(a.text), (a.k as number) ?? 5);
-      break;
-    case 'recall_docs':
-      result = await recallDocs(h, embedder, String(a.text), (a.k as number) ?? 5);
-      break;
-    case 'lexical':
-      result = lexical(h, String(a.text), (a.k as number) ?? 50);
-      break;
-    case 'reindex':
-      result = await reindex(h, embedder, String(a.root));
-      break;
-    case 'export_range':
-      result = await exportRange(h, String(a.since), String(a.until));
-      break;
-    default:
-      throw new Error(`Unknown tool: ${name}`);
-  }
+  const result = await callTool(h, embedder, name, args as Record<string, unknown>);
   return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
 });
 
