@@ -75,11 +75,19 @@ export class VogonApprovalStore implements ApprovalStore, AuditLogger {
   async addPending(input: AddPendingInput): Promise<string> {
     const id = `pa_${randomUUID()}`;
     const ts = nowIso();
+    // Upsert keyed on tool_use_id: a re-request replaces the prior (terminal) row
+    // with a fresh pending one, so there is exactly one staged row per tool_use_id
+    // and "most recent wins" is deterministic (no fragile timestamp/uuid tie-break).
     this.h.raw
       .prepare(
         `INSERT INTO approvals
-           (id, tool, target, payload, tier, tool_use_id, session_id, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`,
+           (id, tool, target, payload, tier, tool_use_id, session_id, status, decided_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', NULL, ?, ?)
+         ON CONFLICT(tool_use_id) DO UPDATE SET
+           id = excluded.id, tool = excluded.tool, target = excluded.target,
+           payload = excluded.payload, tier = excluded.tier, session_id = excluded.session_id,
+           status = 'pending', decided_by = NULL,
+           created_at = excluded.created_at, updated_at = excluded.updated_at`,
       )
       .run(
         id,
@@ -96,10 +104,9 @@ export class VogonApprovalStore implements ApprovalStore, AuditLogger {
   }
 
   async getByToolUseId(toolUseId: string): Promise<PendingApproval | undefined> {
+    // tool_use_id is UNIQUE (one staged row each), so this is unambiguous.
     const row = this.h.raw
-      .prepare(
-        `SELECT * FROM approvals WHERE tool_use_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`,
-      )
+      .prepare(`SELECT * FROM approvals WHERE tool_use_id = ? LIMIT 1`)
       .get(toolUseId) as ApprovalRowDb | undefined;
     return row ? toApproval(row) : undefined;
   }
@@ -118,15 +125,15 @@ export class VogonApprovalStore implements ApprovalStore, AuditLogger {
     return txn();
   }
 
-  async setDecisionByToolUseId(toolUseId: string, status: 'approved' | 'denied', _by?: string): Promise<boolean> {
+  async setDecisionByToolUseId(toolUseId: string, status: 'approved' | 'denied', by?: string): Promise<boolean> {
     const txn = this.h.raw.transaction(() => {
       const row = this.h.raw
-        .prepare(`SELECT id, status FROM approvals WHERE tool_use_id = ? ORDER BY created_at DESC, id DESC LIMIT 1`)
+        .prepare(`SELECT id, status FROM approvals WHERE tool_use_id = ? LIMIT 1`)
         .get(toolUseId) as { id: string; status: string } | undefined;
       if (!row || !canDecide(row.status, status)) return false;
       this.h.raw
-        .prepare(`UPDATE approvals SET status = ?, updated_at = ? WHERE id = ?`)
-        .run(status, nowIso(), row.id);
+        .prepare(`UPDATE approvals SET status = ?, decided_by = ?, updated_at = ? WHERE id = ?`)
+        .run(status, by ?? null, nowIso(), row.id);
       return true;
     });
     return txn();

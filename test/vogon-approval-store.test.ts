@@ -61,6 +61,24 @@ describe('VogonApprovalStore', () => {
     expect((await store.list()).map((r) => r.tool_use_id).sort()).toEqual(['tu_1', 'tu_2']);
   });
 
+  it('re-staging a tool_use_id replaces the prior row (one row, most-recent state)', async () => {
+    await store.addPending(pending);
+    await store.setDecisionByToolUseId('tu_1', 'denied'); // a prior, terminal attempt
+    const id2 = await store.addPending(pending);          // re-request approval
+
+    const row = await store.getByToolUseId('tu_1');
+    expect(row?.id).toBe(id2);
+    expect(row?.status).toBe('pending');                  // fresh, not the stale denied row
+    expect(await store.list()).toHaveLength(1);           // not 2
+  });
+
+  it('records who decided (decided_by) for the durable audit', async () => {
+    await store.addPending(pending);
+    await store.setDecisionByToolUseId('tu_1', 'approved', 'cli');
+    const r = h.raw.prepare('SELECT decided_by FROM approvals WHERE tool_use_id = ?').get('tu_1');
+    expect(r).toMatchObject({ decided_by: 'cli' });
+  });
+
   it('writes an audit entry', async () => {
     await store.log({ actor: 'agent', kind: 'approval_request', content: 'x -> y', approval_status: 'pending', meta: { n: 1 } });
     const rows = h.raw.prepare('SELECT actor, kind, approval_status FROM audit_log').all();

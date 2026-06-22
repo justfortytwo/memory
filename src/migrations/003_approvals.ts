@@ -15,9 +15,12 @@ export async function up(k: Knex): Promise<void> {
       t.string('tool_use_id').notNullable();
       t.string('session_id').nullable();
       t.string('status').notNullable().defaultTo('pending'); // pending|approved|denied|executed|expired
+      t.string('decided_by').nullable();      // who approved/denied (audit attribution)
       t.string('created_at').notNullable();
       t.string('updated_at').notNullable();
-      t.index(['tool_use_id']);
+      // One staged row per tool_use_id (vogon's "most-recent-wins" contract);
+      // addPending upserts, so a re-request replaces the prior row deterministically.
+      t.unique(['tool_use_id']);
       t.index(['status']);
     })
     .createTable('audit_log', (t) => {

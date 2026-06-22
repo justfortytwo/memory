@@ -109,7 +109,9 @@ export async function enrich(
       continue;
     }
     // Dedupe by meaning — unless the candidate explicitly supersedes a prior row,
-    // in which case the update is intentional even if it reads similar.
+    // in which case the update is intentional even if it reads similar. Note:
+    // recall is live-only, so we dedupe against LIVE memories, not superseded
+    // history (a candidate matching a dead row is intentionally re-written).
     if (c.supersedes == null) {
       const near = await recall(h, embedder, c.content, 1);
       if (near.length > 0 && near[0].distance < DEDUPE_DISTANCE) {
