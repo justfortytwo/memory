@@ -4,6 +4,8 @@
   "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). Ford-agnostic.",
   "license": "MIT",
   "author": { "name": "Enrico Deleo", "url": "https://enricodeleo.com" },
+  "homepage": "https://forty-two.it",
+  "repository": { "type": "git", "url": "git+https://github.com/justfortytwo/guide.git" },
   "type": "module",
   "engines": { "node": ">=18" },
   "bin": {
