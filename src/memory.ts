@@ -7,17 +7,17 @@ import { vecToBuffer } from './embedder.js';
 // ---------------------------------------------------------------------------
 // Generic semantic memory store.
 //
-// This is the Ford-agnostic core extracted from fortytwo/services/memory-mcp.
-// What was stripped (Ford-specific, NOT brought into this package):
+// This is the persona-agnostic core extracted from fortytwo/services/memory-mcp.
+// What was stripped (persona-specific, NOT brought into this package):
 //   - the `journal_entries` schema (channel/direction/actor/approval_status)
 //     and OWNER_ACTOR/ASSISTANT_ACTOR coupling — replaced by a generic
 //     `memories` table keyed on `source` / `observed` / `date` / `tags`.
 //   - the policy/authority/source-envelope machinery (policy.ts) — that is a
 //     trust/prompt-injection concern owned elsewhere.
 //     TODO(extract): if a shared trust model is wanted, it belongs in a sibling
-//     package (e.g. `@justfortytwo/policy`), not here.
+//     package (e.g. `@justfortytwo/gate`), not here.
 //   - the house-rules propose/approve learning loop, the pending-approval gate
-//     (registry_pending), and the deferred-jobs runner (jobs.ts) — all Ford
+//     (registry_pending), and the deferred-jobs runner (jobs.ts) — all original
 //     assistant orchestration, out of scope for a standalone memory server.
 // ---------------------------------------------------------------------------
 
@@ -163,7 +163,7 @@ export interface ReindexResult { indexed: number; removed: number; }
 /**
  * Self-heal the doc recall index from a directory of markdown files. Hashes
  * content to skip unchanged files; removes index rows for files that vanished.
- * Generic version of Ford's Guide reindex (no curated-Guide assumptions).
+ * Generic version of the original assistant's curated-doc reindex (no curated-corpus assumptions).
  */
 export async function reindex(
   h: DbHandles,

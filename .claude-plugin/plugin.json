@@ -1,5 +1,5 @@
 {
-  "name": "guide",
+  "name": "memory",
   "version": "0.1.0",
-  "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). Stores and recalls memories by meaning; Ford-agnostic."
+  "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). Stores and recalls memories by meaning; persona-agnostic."
 }

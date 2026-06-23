@@ -12,9 +12,9 @@ import { runMigrations } from './migrate.js';
 import { FakeEmbedder, OllamaEmbedder, type Embedder } from './embedder.js';
 import { toolDefinitions } from './tools.js';
 import { callTool } from './dispatch.js';
-import { GUIDE_SERVER_ID } from './contract.js';
+import { MEMORY_SERVER_ID } from './contract.js';
 
-// Public surface re-exports so consumers can `import { ... } from '@justfortytwo/guide'`.
+// Public surface re-exports so consumers can `import { ... } from '@justfortytwo/memory'`.
 export * from './contract.js';
 export * from './embedder.js';
 export { openDb, type DbHandles, EMBED_DIM } from './db.js';
@@ -26,10 +26,10 @@ export {
 } from './memory.js';
 export { enrich, enrichFromTurn, type EnrichmentCandidate, type EnrichmentResult } from './enrichment.js';
 export { toolDefinitions } from './tools.js';
-// guide's implementation of vogon's ApprovalStore + AuditLogger seam (guide -> vogon).
-export { VogonApprovalStore } from './vogon-approval-store.js';
+// memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
+export { GateApprovalStore } from './gate-approval-store.js';
 
-// Standalone, Ford-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
+// Standalone, persona-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
 const DB_PATH = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve('memory.db');
 
 // EMBED_MODEL present → real Ollama embedder; absent → deterministic FakeEmbedder
@@ -43,7 +43,7 @@ const h = openDb(DB_PATH);
 await runMigrations(h.k);
 
 const server = new Server(
-  { name: GUIDE_SERVER_ID, version: '0.1.0' },
+  { name: MEMORY_SERVER_ID, version: '0.1.0' },
   { capabilities: { tools: {} } },
 );
 

@@ -1,11 +1,11 @@
-# @justfortytwo/guide
+# @justfortytwo/memory
 
 A standalone **semantic-memory MCP server**. It stores text "memories" with
 free-form provenance and recalls them by meaning (vector search), by keyword
 (FTS5), or by structured filter. Backed by SQLite + [`sqlite-vec`], embeddings
 from a local [Ollama] model.
 
-It is **Ford-agnostic**: no journal/persona/approval coupling, just a generic
+It is **persona-agnostic**: no journal/persona/approval coupling, just a generic
 memory store and tool surface. It can be used on its own, or as a Claude Code
 plugin.
 
@@ -31,8 +31,8 @@ documents separately from the memory store.
 
 ## MCP tools
 
-The server registers under the id **`fortytwo-guide`**, so a consumer calls the
-tools as `mcp__fortytwo-guide__<tool>`:
+The server registers under the id **`fortytwo-memory`**, so a consumer calls the
+tools as `mcp__fortytwo-memory__<tool>`:
 
 | tool | description |
 |------|-------------|
@@ -50,16 +50,16 @@ Consumers depend on the **tool surface**, not the internals. The contract is
 versioned:
 
 ```ts
-import { GUIDE_TOOL_CONTRACT_VERSION, guideToolContract } from '@justfortytwo/guide/contract';
+import { MEMORY_TOOL_CONTRACT_VERSION, memoryToolContract } from '@justfortytwo/memory/contract';
 ```
 
 - A **major** change to a tool name, its required inputs, or its result shape is
-  a **contract break** → bump `GUIDE_TOOL_CONTRACT_VERSION`. Siblings pin a
-  caret range on `@justfortytwo/guide`, so a major bump forces an explicit
+  a **contract break** → bump `MEMORY_TOOL_CONTRACT_VERSION`. Siblings pin a
+  caret range on `@justfortytwo/memory`, so a major bump forces an explicit
   opt-in.
 - Additive changes (new optional inputs, new tools) do **not** bump it.
 
-`guideToolContract` is the authoritative human-readable list of tools and their
+`memoryToolContract` is the authoritative human-readable list of tools and their
 guarantees, kept in sync with the wire schema in `src/tools.ts`.
 
 ## Embedder
@@ -93,16 +93,16 @@ npm run build
 DB_PATH=./memory.db npm run migrate
 
 # run the MCP server over stdio
-DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-guide
+DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-memory
 ```
 
-The `bin` is `fortytwo-guide` → `dist/index.js`. You can also `npx -y
-@justfortytwo/guide` once published.
+The `bin` is `fortytwo-memory` → `dist/index.js`. You can also `npx -y
+@justfortytwo/memory` once published.
 
 ### As a library
 
 ```ts
-import { openDb, runMigrations, OllamaEmbedder, store, recall } from '@justfortytwo/guide';
+import { openDb, runMigrations, OllamaEmbedder, store, recall } from '@justfortytwo/memory';
 
 const h = openDb('memory.db');
 await runMigrations(h.k);
@@ -115,14 +115,14 @@ const hits = await recall(h, embedder, 'how do I deploy?', 5);
 ## As a Claude Code plugin
 
 `.claude-plugin/plugin.json` declares the plugin; `.mcp.json` registers the
-`fortytwo-guide` server. By default it launches via `npx`:
+`fortytwo-memory` server. By default it launches via `npx`:
 
 ```jsonc
 {
   "mcpServers": {
-    "fortytwo-guide": {
+    "fortytwo-memory": {
       "command": "npx",
-      "args": ["-y", "@justfortytwo/guide"],
+      "args": ["-y", "@justfortytwo/memory"],
       "env": {
         "OLLAMA_BASE_URL": "http://localhost:11434",
         "EMBED_MODEL": "qwen3-embedding:0.6b",
@@ -148,20 +148,20 @@ replace a stale belief (history is kept, never a silent overwrite).
 and feeds its candidates to `enrich`.
 
 The salience extractor itself is model-driven and lives in the sibling
-**`@justfortytwo/deepthought`** engine (a `SalienceExtractor` with an injected
-`LlmClient`) — guide owns only the dedupe + write, never the model call.
+**`@justfortytwo/salience`** engine (a `SalienceExtractor` with an injected
+`LlmClient`) — memory owns only the dedupe + write, never the model call.
 
 ## Peer seams
 
-guide depends on two sibling packages **one-directionally** (declared as optional
+memory depends on two sibling packages **one-directionally** (declared as optional
 peers, no cycle):
 
-- **`@justfortytwo/vogon`** — guide ships `VogonApprovalStore`
-  (`src/vogon-approval-store.ts`), a durable SQLite-backed implementation of
-  vogon's `ApprovalStore` + `AuditLogger` interfaces. Pass it to vogon's
+- **`@justfortytwo/gate`** — memory ships `GateApprovalStore`
+  (`src/gate-approval-store.ts`), a durable SQLite-backed implementation of
+  gate's `ApprovalStore` + `AuditLogger` interfaces. Pass it to gate's
   `decide(..., { store, audit })` to back the safety gate's one-shot approvals
-  with guide's db instead of the gate's standalone JSONL store.
-- **`@justfortytwo/deepthought`** — the model-driven salience extractor injected
+  with memory's db instead of the gate's standalone JSONL store.
+- **`@justfortytwo/salience`** — the model-driven salience extractor injected
   into `enrichFromTurn` (see above).
 
 ## Development

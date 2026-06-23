@@ -1,13 +1,13 @@
-// Cross-package seam: vogon's REAL gate (decide) backed by guide's durable
-// VogonApprovalStore + audit. Proves guide can host the gate's approvals.
+// Cross-package seam: gate's REAL gate (decide) backed by memory's durable
+// GateApprovalStore + audit. Proves memory can host the gate's approvals.
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseManifest, decide, type Manifest } from '@justfortytwo/vogon';
+import { parseManifest, decide, type Manifest } from '@justfortytwo/gate';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { VogonApprovalStore } from '../src/vogon-approval-store.js';
+import { GateApprovalStore } from '../src/gate-approval-store.js';
 
 const MANIFEST = `
 default_tier = "external"
@@ -18,19 +18,19 @@ default_tier = "external"
 
 let dir: string;
 let h: DbHandles;
-let store: VogonApprovalStore;
+let store: GateApprovalStore;
 let m: Manifest;
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'jf-seam-'));
   h = openDb(join(dir, 't.db'));
   await runMigrations(h.k);
-  store = new VogonApprovalStore(h);
+  store = new GateApprovalStore(h);
   m = parseManifest(MANIFEST);
 });
 afterEach(() => { h.k.destroy(); rmSync(dir, { recursive: true, force: true }); });
 
-describe("vogon gate backed by guide's VogonApprovalStore", () => {
+describe("the gate backed by memory's GateApprovalStore", () => {
   it('drives defer -> approve -> allow-once -> deny, recording an audit trail', async () => {
     const ctx = { toolName: 'mcp__messaging__send', toolInput: { to: 'x' }, toolUseId: 'tu_1' };
 

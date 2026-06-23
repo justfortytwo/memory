@@ -1,15 +1,15 @@
 {
-  "name": "@justfortytwo/guide",
+  "name": "@justfortytwo/memory",
   "version": "0.1.0",
-  "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). Ford-agnostic.",
+  "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). persona-agnostic.",
   "license": "MIT",
   "author": { "name": "Enrico Deleo", "url": "https://enricodeleo.com" },
   "homepage": "https://forty-two.it",
-  "repository": { "type": "git", "url": "git+https://github.com/justfortytwo/guide.git" },
+  "repository": { "type": "git", "url": "git+https://github.com/justfortytwo/memory.git" },
   "type": "module",
   "engines": { "node": ">=18" },
   "bin": {
-    "fortytwo-guide": "dist/index.js"
+    "fortytwo-memory": "dist/index.js"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -36,12 +36,12 @@
     "sqlite-vec": "^0.1.6"
   },
   "peerDependencies": {
-    "@justfortytwo/vogon": "^0.1.0",
-    "@justfortytwo/deepthought": "^0.1.0"
+    "@justfortytwo/gate": "^0.1.0",
+    "@justfortytwo/salience": "^0.1.0"
   },
   "peerDependenciesMeta": {
-    "@justfortytwo/vogon": { "optional": true },
-    "@justfortytwo/deepthought": { "optional": true }
+    "@justfortytwo/gate": { "optional": true },
+    "@justfortytwo/salience": { "optional": true }
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.0",

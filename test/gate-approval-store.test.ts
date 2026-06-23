@@ -4,23 +4,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { VogonApprovalStore } from '../src/vogon-approval-store.js';
+import { GateApprovalStore } from '../src/gate-approval-store.js';
 
 let dir: string;
 let h: DbHandles;
-let store: VogonApprovalStore;
+let store: GateApprovalStore;
 
 beforeEach(async () => {
   dir = mkdtempSync(join(tmpdir(), 'jf-appr-'));
   h = openDb(join(dir, 't.db'));
   await runMigrations(h.k);
-  store = new VogonApprovalStore(h);
+  store = new GateApprovalStore(h);
 });
 afterEach(() => { h.k.destroy(); rmSync(dir, { recursive: true, force: true }); });
 
 const pending = { tool: 'mcp__messaging__send', target: 'to=x', payload: { to: 'x' }, tier: 'external', tool_use_id: 'tu_1' };
 
-describe('VogonApprovalStore', () => {
+describe('GateApprovalStore', () => {
   it('stages a pending approval and reads it back with provenance', async () => {
     const id = await store.addPending(pending);
     expect(id).toMatch(/^pa_/);

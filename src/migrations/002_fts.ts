@@ -1,7 +1,7 @@
 import type { Knex } from 'knex';
 
 // SQLite-only (FTS5 is built in). The triggers keep memory_fts in sync with the
-// `memories` content column. Generic rename of Ford's journal_fts (003_fts).
+// `memories` content column. Generic rename of the original assistant's journal_fts (003_fts).
 export async function up(k: Knex): Promise<void> {
   if (k.client.config.client !== 'better-sqlite3') return;
   await k.raw(`CREATE VIRTUAL TABLE IF NOT EXISTS memory_fts USING fts5(content, content='memories', content_rowid='id')`);

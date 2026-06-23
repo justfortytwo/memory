@@ -1,13 +1,13 @@
-// guide's implementation of vogon's host-integration seam.
+// memory's implementation of gate's host-integration seam.
 //
-// @justfortytwo/vogon (the safety gate) defines the ApprovalStore + AuditLogger
+// @justfortytwo/gate (the safety gate) defines the ApprovalStore + AuditLogger
 // interfaces but ships only standalone in-memory / JSONL stores. This is the
 // RICHER, durable backing the gate's `decide()` accepts via opts.store / opts.audit:
-// a transactional store + audit trail on guide's own SQLite db (tables created by
+// a transactional store + audit trail on memory's own SQLite db (tables created by
 // migration 003_approvals).
 //
-// Dependency direction is ONE-WAY: guide -> vogon (we import vogon's TYPES; vogon
-// never imports guide). No cycle. vogon is a peerDependency of guide.
+// Dependency direction is ONE-WAY: memory -> gate (we import gate's TYPES; gate
+// never imports memory). No cycle. gate is a peerDependency of memory.
 
 import { randomUUID } from 'node:crypto';
 import type {
@@ -17,7 +17,7 @@ import type {
   ApprovalStatus,
   PendingApproval,
   AddPendingInput,
-} from '@justfortytwo/vogon';
+} from '@justfortytwo/gate';
 import type { DbHandles } from './db.js';
 
 function nowIso(): string {
@@ -25,7 +25,7 @@ function nowIso(): string {
 }
 
 /**
- * Fail-closed transition guard (same invariant as vogon's stock stores): only a
+ * Fail-closed transition guard (same invariant as gate's stock stores): only a
  * pending call may be approved/denied, and an approval may be revoked (-> denied)
  * before it is consumed. Terminal states (executed/denied/expired) are immutable,
  * so a decision can never resurrect a spent or denied one-shot.
@@ -65,11 +65,11 @@ function toApproval(r: ApprovalRowDb): PendingApproval {
 }
 
 /**
- * SQLite-backed ApprovalStore + AuditLogger for the vogon gate. Pass an instance
- * to vogon's `decide(manifest, ctx, { store, audit })` so staged one-shots and the
- * audit trail live in guide's durable db instead of the gate's JSONL default.
+ * SQLite-backed ApprovalStore + AuditLogger for the gate. Pass an instance
+ * to gate's `decide(manifest, ctx, { store, audit })` so staged one-shots and the
+ * audit trail live in memory's durable db instead of the gate's JSONL default.
  */
-export class VogonApprovalStore implements ApprovalStore, AuditLogger {
+export class GateApprovalStore implements ApprovalStore, AuditLogger {
   constructor(private readonly h: DbHandles) {}
 
   async addPending(input: AddPendingInput): Promise<string> {

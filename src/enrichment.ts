@@ -1,9 +1,9 @@
 import type { DbHandles } from './db.js';
 import type { Embedder } from './embedder.js';
 import { recall, store } from './memory.js';
-// TODO(wire): the salience extractor lives in the @justfortytwo/deepthought peer.
-//   import type { SalienceExtractor, Turn } from '@justfortytwo/deepthought';
-// Local mirrors of deepthought's surface so this file type-checks before the peer
+// TODO(wire): the salience extractor lives in the @justfortytwo/salience peer.
+//   import type { SalienceExtractor, Turn } from '@justfortytwo/salience';
+// Local mirrors of salience's surface so this file type-checks before the peer
 // is installed. The Candidate shape is intentionally identical to EnrichmentCandidate.
 interface SalienceExtractor {
   extractSalient(turn: { text: string; source?: string; observed?: string; date?: string; meta?: Record<string, unknown> }): Promise<EnrichmentCandidate[]>;
@@ -27,7 +27,7 @@ interface SalienceExtractor {
 //      the store does not fill with noise.
 //      The extractor is model-driven, and the LLM call is NOT owned by this
 //      package (a memory server must not embed a model client). The salience
-//      step lives in the sibling `@justfortytwo/deepthought` engine, which
+//      step lives in the sibling `@justfortytwo/salience` engine, which
 //      defines a `SalienceExtractor` (injected `LlmClient`) and returns scored
 //      candidates. We inject that extractor and pass its candidates IN to
 //      enrich(); this file owns only dedupe + write.
@@ -43,7 +43,7 @@ interface SalienceExtractor {
 //            Recency wins for live recall; nothing is deleted.
 //      TODO(impl): "same meaning" vs "contradiction" needs more than vector
 //        distance (two close vectors can be opposite facts). This likely needs
-//        the same sibling deepthought step as (1) to judge the relation.
+//        the same sibling salience step as (1) to judge the relation.
 //
 //   3. WRITE  (tagged provenance)
 //      Persist surviving candidates via memory.store, tagged with:
@@ -74,7 +74,7 @@ export interface EnrichmentCandidate {
   meta?: Record<string, unknown>;
   /**
    * If set, this candidate supersedes the given memory id — an upstream
-   * contradiction/update judgment (e.g. from the deepthought salience step).
+   * contradiction/update judgment (e.g. from the salience salience step).
    * enrich() honors it: the new row is written and the old row is flagged
    * superseded (history kept, never overwritten), even past the dedupe check.
    */
@@ -138,9 +138,9 @@ export async function enrich(
 /**
  * Post-turn entry point: extract salient candidates from a turn, then enrich.
  *
- * The extraction step is delegated to the sibling @justfortytwo/deepthought
- * engine via an INJECTED SalienceExtractor — guide owns dedupe + write, never the
- * model client. The host builds the extractor (deepthought's createSalienceExtractor
+ * The extraction step is delegated to the sibling @justfortytwo/salience
+ * engine via an INJECTED SalienceExtractor — memory owns dedupe + write, never the
+ * model client. The host builds the extractor (salience's createSalienceExtractor
  * with its own LlmClient) and passes it in here.
  */
 export async function enrichFromTurn(
@@ -149,8 +149,8 @@ export async function enrichFromTurn(
   turn: { text: string; source?: string },
   extractor: SalienceExtractor,
 ): Promise<EnrichmentResult> {
-  // guide owns dedupe + write; the salience extraction (the model call) is the
-  // injected @justfortytwo/deepthought engine's. We only wire the two together.
+  // memory owns dedupe + write; the salience extraction (the model call) is the
+  // injected @justfortytwo/salience engine's. We only wire the two together.
   const candidates = await extractor.extractSalient(turn);
   return enrich(h, embedder, candidates);
 }

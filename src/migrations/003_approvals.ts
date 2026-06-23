@@ -1,8 +1,8 @@
 import type { Knex } from 'knex';
 
-// Durable backing for vogon's ApprovalStore + AuditLogger seam (see
-// vogon-approval-store.ts). `approvals` holds staged one-shot approvals keyed by
-// tool_use_id; `audit_log` is an append-only trail. Both live on guide's db so a
+// Durable backing for gate's ApprovalStore + AuditLogger seam (see
+// gate-approval-store.ts). `approvals` holds staged one-shot approvals keyed by
+// tool_use_id; `audit_log` is an append-only trail. Both live on memory's db so a
 // host can give the gate a transactional store instead of its JSONL default.
 export async function up(k: Knex): Promise<void> {
   await k.schema
@@ -18,7 +18,7 @@ export async function up(k: Knex): Promise<void> {
       t.string('decided_by').nullable();      // who approved/denied (audit attribution)
       t.string('created_at').notNullable();
       t.string('updated_at').notNullable();
-      // One staged row per tool_use_id (vogon's "most-recent-wins" contract);
+      // One staged row per tool_use_id (gate's "most-recent-wins" contract);
       // addPending upserts, so a re-request replaces the prior row deterministically.
       t.unique(['tool_use_id']);
       t.index(['status']);

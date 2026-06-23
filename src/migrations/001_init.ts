@@ -1,8 +1,8 @@
 import type { Knex } from 'knex';
 
-// Generic memory store. Stripped from Ford's 001_init: the journal_entries
+// Generic memory store. Stripped from the original assistant's 001_init: the journal_entries
 // channel/direction/actor/approval_status columns, the `entities` table, and
-// the registry_pending / registry_reminders tables (all Ford orchestration).
+// the registry_pending / registry_reminders tables (all original-assistant orchestration).
 //
 // The vec0 tables (memory_vec, doc_vec) are created on the raw sqlite-vec
 // handle in db.ts — NOT here — because Knex's connection does not load the

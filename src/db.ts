@@ -29,7 +29,7 @@ export function openDb(dbPath: string): DbHandles {
   // compiled into SQLite, and the relational schema CAN be Knex migrations.)
   //
   // `memory_vec` indexes the generic memory store; `doc_vec` indexes reindexed
-  // markdown documents. (Generic rename of Ford's `journal_vec`.)
+  // markdown documents. (Generic rename of the original assistant's `journal_vec`.)
   const ddl = (sql: string) => raw.exec(sql);
   ddl(`CREATE VIRTUAL TABLE IF NOT EXISTS memory_vec USING vec0(embedding float[${EMBED_DIM}])`);
   ddl(`CREATE VIRTUAL TABLE IF NOT EXISTS doc_vec USING vec0(embedding float[${EMBED_DIM}])`);
