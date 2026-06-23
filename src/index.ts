@@ -6,6 +6,7 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { resolve, dirname } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { mkdirSync } from 'node:fs';
 import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
@@ -29,33 +30,49 @@ export { toolDefinitions } from './tools.js';
 // memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
 export { GateApprovalStore } from './gate-approval-store.js';
 
-// Standalone, persona-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
-const DB_PATH = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve('memory.db');
+/**
+ * Boot the MCP server over stdio. Kept behind an entrypoint guard so that
+ * IMPORTING this package as a library (e.g. the installer calling
+ * `runMigrations`/`openDb`) does NOT open a DB, run migrations, or connect a
+ * transport. Only running the `fortytwo-memory` bin directly starts the server.
+ */
+export async function startServer(): Promise<void> {
+  // Standalone, persona-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
+  const DB_PATH = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve('memory.db');
 
-// EMBED_MODEL present → real Ollama embedder; absent → deterministic FakeEmbedder
-// (lets the server boot with zero infra for tests / first-run smoke checks).
-const embedder: Embedder = process.env.EMBED_MODEL
-  ? new OllamaEmbedder(process.env.EMBED_MODEL, process.env.OLLAMA_BASE_URL)
-  : new FakeEmbedder();
+  // EMBED_MODEL present → real Ollama embedder; absent → deterministic FakeEmbedder
+  // (lets the server boot with zero infra for tests / first-run smoke checks).
+  const embedder: Embedder = process.env.EMBED_MODEL
+    ? new OllamaEmbedder(process.env.EMBED_MODEL, process.env.OLLAMA_BASE_URL)
+    : new FakeEmbedder();
 
-mkdirSync(dirname(DB_PATH), { recursive: true });
-const h = openDb(DB_PATH);
-await runMigrations(h.k);
+  mkdirSync(dirname(DB_PATH), { recursive: true });
+  const h = openDb(DB_PATH);
+  await runMigrations(h.k);
 
-const server = new Server(
-  { name: MEMORY_SERVER_ID, version: '0.1.0' },
-  { capabilities: { tools: {} } },
-);
+  const server = new Server(
+    { name: MEMORY_SERVER_ID, version: '0.1.0' },
+    { capabilities: { tools: {} } },
+  );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({
-  tools: toolDefinitions(),
-}));
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+    tools: toolDefinitions(),
+  }));
 
-server.setRequestHandler(CallToolRequestSchema, async (req) => {
-  const { name, arguments: args = {} } = req.params;
-  const result = await callTool(h, embedder, name, args as Record<string, unknown>);
-  return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-});
+  server.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const { name, arguments: args = {} } = req.params;
+    const result = await callTool(h, embedder, name, args as Record<string, unknown>);
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+  });
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+// Run the server only when invoked directly as the `fortytwo-memory` bin.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  startServer().catch((err) => {
+    process.stderr.write(`fortytwo-memory: ${err?.stack ?? err}\n`);
+    process.exit(1);
+  });
+}
