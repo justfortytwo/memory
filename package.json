@@ -1,6 +1,6 @@
 {
   "name": "@justfortytwo/memory",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). persona-agnostic.",
   "license": "MIT",
   "author": {
@@ -14,7 +14,7 @@
   },
   "type": "module",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "bin": {
     "fortytwo-memory": "dist/index.js"
@@ -40,7 +40,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^12.0.0",
     "knex": "^3.1.0",
     "sqlite-vec": "^0.1.6"
   },
