@@ -96,13 +96,13 @@ DB_PATH=./memory.db npm run migrate
 DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-memory
 ```
 
-The `bin` is `fortytwo-memory` → `dist/index.js`. You can also `npx -y
-@justfortytwo/memory` once published.
+The `bin` is `fortytwo-memory` → `dist/index.js`. You can also run it with
+`npx -y @justfortytwo/memory` (it is published to npm).
 
 ### As a library
 
 ```ts
-import { openDb, runMigrations, OllamaEmbedder, store, recall } from '@justfortytwo/memory';
+import { openDb, runMigrations, OllamaEmbedder, store, recall, deleteByIds } from '@justfortytwo/memory';
 
 const h = openDb('memory.db');
 await runMigrations(h.k);
@@ -110,7 +110,18 @@ const embedder = new OllamaEmbedder();
 
 await store(h, embedder, { content: 'the deploy script lives in scripts/deploy.sh', source: 'owner', observed: 'stated' });
 const hits = await recall(h, embedder, 'how do I deploy?', 5);
+
+deleteByIds(h, [hits[0].id]); // hard-delete (row + vector + FTS); returns the count removed
 ```
+
+### Deleting memories
+
+`deleteByIds(h, ids)` hard-deletes memories — the row, its vector, and its FTS
+entry — so nothing resurfaces in `recall`/`lexical`/`query`. It is intentionally
+a **library API and NOT an MCP tool**: deletion is an owner-privileged operation,
+and exposing it to the assistant's turn loop would let prompt-injected content
+trick it into erasing memories. Selecting *which* ids to remove (by query, tag,
+date range, …) is the caller's job — see `@justfortytwo/installer`'s `forget`.
 
 ## As a Claude Code plugin
 
