@@ -26,14 +26,15 @@ export class FakeEmbedder implements Embedder {
   }
 }
 
-/** Calls a local Ollama /api/embeddings endpoint. */
+/** Calls an Ollama /api/embeddings endpoint (local or remote). */
 export class OllamaEmbedder implements Embedder {
   constructor(
     private model = 'qwen3-embedding:0.6b',
     private baseUrl = process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
   ) {}
   async embed(text: string): Promise<Vec> {
-    const res = await fetch(`${this.baseUrl}/api/embeddings`, {
+    // Strip a trailing slash so a base URL like `https://host/` doesn't yield `host//api/...`.
+    const res = await fetch(`${this.baseUrl.replace(/\/$/, '')}/api/embeddings`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: this.model, prompt: text }),
