@@ -88,6 +88,26 @@ export async function store(h: DbHandles, embedder: Embedder, m: MemoryInput): P
   return txn();
 }
 
+/**
+ * Hard-delete memories by id. OWNER-PRIVILEGED: this is intentionally NOT an MCP
+ * tool — the assistant must never be able to delete memories from (possibly
+ * prompt-injected) content. Removes the row, its vector (memory_vec is not
+ * trigger-backed, so clear it explicitly, one rowid at a time as vec0 wants),
+ * and the FTS entry (handled by the memory_fts AFTER-DELETE trigger). Returns
+ * the number of `memories` rows removed; missing ids are ignored.
+ */
+export function deleteByIds(h: DbHandles, ids: number[]): number {
+  if (ids.length === 0) return 0;
+  const delVec = h.raw.prepare('DELETE FROM memory_vec WHERE rowid = ?');
+  const placeholders = ids.map(() => '?').join(', ');
+  const delMem = h.raw.prepare(`DELETE FROM memories WHERE id IN (${placeholders})`);
+  const txn = h.raw.transaction((rowids: number[]) => {
+    for (const id of rowids) delVec.run(BigInt(id)); // vec0 binds integers; point delete per rowid
+    return Number(delMem.run(...rowids).changes); // FTS cleaned by the AFTER-DELETE trigger
+  });
+  return txn(ids);
+}
+
 export interface QueryOpts {
   source?: string;
   observed?: string;

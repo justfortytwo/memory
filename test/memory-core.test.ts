@@ -6,7 +6,7 @@ import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
 import { FakeEmbedder } from '../src/embedder.js';
 import {
-  store, query, recall, lexical, reindex, recallDocs, exportRange, reembed,
+  store, query, recall, lexical, reindex, recallDocs, exportRange, reembed, deleteByIds,
 } from '../src/memory.js';
 
 let dir: string;
@@ -96,6 +96,32 @@ describe('reindex + recall_docs', () => {
     unlinkSync(join(docs, 'b.md'));
     expect(await reindex(h, e, docs)).toEqual({ indexed: 0, removed: 1 }); // vanished -> pruned
     rmSync(docs, { recursive: true, force: true });
+  });
+});
+
+describe('deleteByIds (owner-privileged hard delete)', () => {
+  it('removes the row from memories, vector recall, AND lexical FTS so nothing resurfaces', async () => {
+    const secret = await store(h, e, { content: 'alpha launch code is 4242' });
+    const keep = await store(h, e, { content: 'beta is public knowledge' });
+
+    expect(deleteByIds(h, [secret])).toBe(1);
+
+    // gone from structured query
+    expect((await query(h, { liveOnly: false })).map((r) => r.id)).toEqual([keep]);
+    // gone from semantic recall
+    expect((await recall(h, e, 'alpha launch code is 4242', 5)).map((r) => r.id)).not.toContain(secret);
+    // gone from lexical FTS (the AFTER-DELETE trigger cleaned it)
+    expect(lexical(h, 'alpha', 10).map((r) => r.id)).not.toContain(secret);
+    // the other memory is untouched
+    expect(lexical(h, 'beta', 10).map((r) => r.id)).toEqual([keep]);
+  });
+
+  it('deletes multiple ids and reports the count; empty input is a no-op', async () => {
+    const a = await store(h, e, { content: 'one' });
+    const b = await store(h, e, { content: 'two' });
+    expect(deleteByIds(h, [])).toBe(0);
+    expect(deleteByIds(h, [a, b, 999999])).toBe(2); // missing id ignored
+    expect(await query(h, {})).toHaveLength(0);
   });
 });
 

@@ -21,7 +21,7 @@ export * from './embedder.js';
 export { openDb, type DbHandles, EMBED_DIM } from './db.js';
 export { runMigrations } from './migrate.js';
 export {
-  store, query, recall, recallDocs, lexical, reindex, exportRange, reembed,
+  store, query, recall, recallDocs, lexical, reindex, exportRange, reembed, deleteByIds,
   type MemoryInput, type MemoryRow, type RecallRow, type QueryOpts,
   type DocRecallRow, type ReindexResult,
 } from './memory.js';
