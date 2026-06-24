@@ -6,8 +6,8 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { resolve, dirname } from 'node:path';
-import { pathToFileURL } from 'node:url';
-import { mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { mkdirSync, realpathSync } from 'node:fs';
 import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
 import { FakeEmbedder, OllamaEmbedder, type Embedder } from './embedder.js';
@@ -70,7 +70,14 @@ export async function startServer(): Promise<void> {
 }
 
 // Run the server only when invoked directly as the `fortytwo-memory` bin.
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+// Realpath comparison so the npm bin symlink resolves to this module.
+function invokedAsBin(): boolean {
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try { return realpathSync(argv1) === realpathSync(fileURLToPath(import.meta.url)); }
+  catch { return false; }
+}
+if (invokedAsBin()) {
   startServer().catch((err) => {
     process.stderr.write(`fortytwo-memory: ${err?.stack ?? err}\n`);
     process.exit(1);
