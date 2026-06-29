@@ -86,6 +86,20 @@ different dimensionality requires a schema change.)
 ## Standalone usage
 
 ```bash
+npm install @justfortytwo/memory
+```
+
+**Prerequisites.** Requires **Node.js >= 20**. The package depends on
+[`better-sqlite3`] `^12`, a native module that ships prebuilt binaries for LTS
+Node releases — on an unsupported Node version or platform, `npm install` will
+compile it from source (needs a C/C++ toolchain). It also needs a local (or
+remote) [Ollama] for real embeddings; without `EMBED_MODEL` set it falls back to
+a deterministic `FakeEmbedder` (see [Embedder](#embedder)). `sqlite-vec` ships as
+a bundled npm dependency — no manual SQLite-extension install is needed.
+
+[`better-sqlite3`]: https://github.com/WiseLibs/better-sqlite3
+
+```bash
 # build (once); the server runs the built JS, not TS
 npm run build
 
@@ -98,6 +112,30 @@ DB_PATH=./memory.db EMBED_MODEL=qwen3-embedding:0.6b fortytwo-memory
 
 The `bin` is `fortytwo-memory` → `dist/index.js`. You can also run it with
 `npx -y @justfortytwo/memory` (it is published to npm).
+
+### Register in your own `.mcp.json`
+
+To use the server in any MCP host (not as a Claude Code plugin), drop this into
+your project's `.mcp.json` with a real DB path:
+
+```json
+{
+  "mcpServers": {
+    "fortytwo-memory": {
+      "command": "npx",
+      "args": ["-y", "@justfortytwo/memory"],
+      "env": {
+        "DB_PATH": "./memory.db",
+        "EMBED_MODEL": "qwen3-embedding:0.6b",
+        "OLLAMA_BASE_URL": "http://localhost:11434"
+      }
+    }
+  }
+}
+```
+
+`OLLAMA_BASE_URL` may point at a remote host. The embedder strips a trailing
+slash, so either form works — but prefer no trailing slash.
 
 ### As a library
 
