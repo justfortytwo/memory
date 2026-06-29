@@ -6,6 +6,7 @@ import { dirname } from 'node:path';
 import * as m001 from './migrations/001_init.js';
 import * as m002 from './migrations/002_fts.js';
 import * as m003 from './migrations/003_approvals.js';
+import * as m004 from './migrations/004_jobs.js';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -16,6 +17,7 @@ const MIGRATIONS: Array<{ name: string } & Migration> = [
   { name: '001_init', up: m001.up, down: m001.down },
   { name: '002_fts', up: m002.up, down: m002.down },
   { name: '003_approvals', up: m003.up, down: m003.down },
+  { name: '004_jobs', up: m004.up, down: m004.down },
 ];
 
 export async function runMigrations(k: Knex): Promise<void> {
