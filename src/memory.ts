@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import type { DbHandles } from './db.js';
 import type { Embedder } from './embedder.js';
 import { vecToBuffer } from './embedder.js';
+import { enqueue, existsPending } from './jobs.js';
 
 // ---------------------------------------------------------------------------
 // Generic semantic memory store.
@@ -85,7 +86,15 @@ export async function store(h: DbHandles, embedder: Embedder, m: MemoryInput): P
     if (m.supersedes != null) markSuperseded.run(id, m.supersedes);
     return id;
   });
-  return txn();
+  const id = txn();
+  // Enqueue a reembed_memory job so the scheduler can re-embed this memory
+  // after an embedder/model change. Deduped: skip if a pending/running job
+  // already targets this id (e.g. rapid back-to-back stores before the
+  // scheduler drains).
+  if (!existsPending(h, 'reembed_memory', `"id":${id}`)) {
+    enqueue(h, { kind: 'reembed_memory', run_at: new Date().toISOString(), payload: { id } });
+  }
+  return id;
 }
 
 /**
