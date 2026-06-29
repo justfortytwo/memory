@@ -26,6 +26,7 @@ export {
   type DocRecallRow, type ReindexResult,
 } from './memory.js';
 export { enrich, enrichFromTurn, type EnrichmentCandidate, type EnrichmentResult } from './enrichment.js';
+export { enqueue, claimDue, complete, fail, listRecurring, requeueStale, existsPending, MAX_ATTEMPTS, type JobRow, type NewJob } from './jobs.js';
 export { toolDefinitions } from './tools.js';
 // memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
 export { GateApprovalStore } from './gate-approval-store.js';
