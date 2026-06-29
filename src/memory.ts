@@ -91,7 +91,7 @@ export async function store(h: DbHandles, embedder: Embedder, m: MemoryInput): P
   // after an embedder/model change. Deduped: skip if a pending/running job
   // already targets this id (e.g. rapid back-to-back stores before the
   // scheduler drains).
-  if (!existsPending(h, 'reembed_memory', `"id":${id}`)) {
+  if (!existsPending(h, 'reembed_memory', id)) {
     enqueue(h, { kind: 'reembed_memory', run_at: new Date().toISOString(), payload: { id } });
   }
   return id;

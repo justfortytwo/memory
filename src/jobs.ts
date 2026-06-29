@@ -63,7 +63,8 @@ export function fail(h: DbHandles, id: number, error: string, opts: { retryAt?: 
   }
 }
 
-export function listRecurring(h: DbHandles): JobRow[] {
+/** All active (non-terminal) jobs — status in ('pending','running'). */
+export function listActive(h: DbHandles): JobRow[] {
   return h.raw.prepare(`SELECT * FROM jobs WHERE status IN ('pending','running')`).all() as JobRow[];
 }
 
@@ -76,12 +77,15 @@ export function requeueStale(h: DbHandles, olderThan: string): void {
 
 /**
  * Returns true if a pending or running job of the given `kind` exists whose
- * payload contains the given `idKey` value. Used to deduplicate producer
- * enqueues (e.g. `reembed_memory` for a specific memory id).
+ * payload `$.id` equals `idValue`. Used to deduplicate producer enqueues (e.g.
+ * `reembed_memory` for a specific memory id). Uses `json_extract` (SQLite
+ * >= 3.38) for an exact match — a substring LIKE would spuriously collide
+ * (id 1 vs 11/100).
  */
-export function existsPending(h: DbHandles, kind: string, idKey: string): boolean {
+export function existsPending(h: DbHandles, kind: string, idValue: number): boolean {
   const row = h.raw.prepare(
-    `SELECT 1 FROM jobs WHERE kind=? AND status IN ('pending','running') AND payload LIKE ? LIMIT 1`,
-  ).get(kind, `%${idKey}%`) as { 1: number } | undefined;
+    `SELECT 1 FROM jobs WHERE kind=? AND status IN ('pending','running')
+       AND json_extract(payload, '$.id') = ? LIMIT 1`,
+  ).get(kind, idValue) as { 1: number } | undefined;
   return row !== undefined;
 }

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { enqueue, claimDue, complete, fail, listRecurring, requeueStale } from '../src/jobs.js';
+import { enqueue, claimDue, complete, fail, listActive, requeueStale, existsPending } from '../src/jobs.js';
 import { FakeEmbedder } from '../src/embedder.js';
 import { store } from '../src/memory.js';
 
@@ -33,7 +33,7 @@ describe('JobStore', () => {
     const id = enqueue(h, { kind: 'sweep', run_at: '2020-01-01T00:00:00Z', recurrence: '0 13 * * *' });
     claimDue(h, '2026-06-29T00:00:00Z');
     complete(h, id, { reschedule: '2026-06-30T13:00:00Z' });
-    const row = listRecurring(h).find((j) => j.id === id)!;
+    const row = listActive(h).find((j) => j.id === id)!;
     expect(row.status).toBe('pending');
     expect(row.run_at).toBe('2026-06-30T13:00:00Z');
   });
@@ -45,7 +45,7 @@ describe('JobStore', () => {
     const after1 = claimDue(h, '2026-06-29T01:00:00Z')[0]!;
     expect(after1.attempts).toBe(1); expect(after1.status).toBe('running');
     fail(h, id, 'boom', {}); fail(h, id, 'boom', {});                  // reach cap (3) → failed
-    expect(listRecurring(h).find((j) => j.id === id)).toBeUndefined();
+    expect(listActive(h).find((j) => j.id === id)).toBeUndefined();
   });
 
   it('requeueStale returns stale running rows to pending', () => {
@@ -56,11 +56,33 @@ describe('JobStore', () => {
   });
 });
 
+describe('existsPending (exact json_extract match)', () => {
+  it('matches the exact payload id and not a different one', () => {
+    enqueue(h, { kind: 'reembed_memory', run_at: '2020-01-01T00:00:00Z', payload: { id: 5 } });
+    expect(existsPending(h, 'reembed_memory', 5)).toBe(true);
+    expect(existsPending(h, 'reembed_memory', 6)).toBe(false);
+  });
+
+  it('does NOT collide on substring ids (id 11 must not match a query for 1)', () => {
+    enqueue(h, { kind: 'reembed_memory', run_at: '2020-01-01T00:00:00Z', payload: { id: 11 } });
+    // Would FAIL under the old `payload LIKE '%"id":1%'` substring match.
+    expect(existsPending(h, 'reembed_memory', 1)).toBe(false);
+    expect(existsPending(h, 'reembed_memory', 11)).toBe(true);
+  });
+
+  it('scopes by kind and ignores terminal (done/failed) jobs', () => {
+    const id = enqueue(h, { kind: 'reembed_memory', run_at: '2020-01-01T00:00:00Z', payload: { id: 7 } });
+    expect(existsPending(h, 'other_kind', 7)).toBe(false); // wrong kind
+    complete(h, id);                                       // → done (terminal)
+    expect(existsPending(h, 'reembed_memory', 7)).toBe(false);
+  });
+});
+
 describe('reembed_memory producer', () => {
   it('store() enqueues exactly one pending reembed_memory job carrying the memory id', async () => {
     const embedder = new FakeEmbedder();
     const memId = await store(h, embedder, { content: 'hello scheduler' });
-    const jobs = listRecurring(h).filter((j) => j.kind === 'reembed_memory');
+    const jobs = listActive(h).filter((j) => j.kind === 'reembed_memory');
     expect(jobs).toHaveLength(1);
     const payload = JSON.parse(jobs[0]!.payload ?? '{}') as { id: unknown };
     expect(payload.id).toBe(memId);
@@ -70,25 +92,19 @@ describe('reembed_memory producer', () => {
     const embedder = new FakeEmbedder();
     await store(h, embedder, { content: 'first' });
     await store(h, embedder, { content: 'second' });
-    const jobs = listRecurring(h).filter((j) => j.kind === 'reembed_memory');
+    const jobs = listActive(h).filter((j) => j.kind === 'reembed_memory');
     expect(jobs).toHaveLength(2);
   });
 
-  it('store() does NOT duplicate a reembed job for the same memory id if one is already pending', async () => {
+  it('store() dedupes: a pre-existing pending reembed for that id blocks a second enqueue', async () => {
     const embedder = new FakeEmbedder();
+    // The next memory row will be id 1 (fresh db). Pre-seed its reembed job.
+    enqueue(h, { kind: 'reembed_memory', run_at: '2020-01-01T00:00:00Z', payload: { id: 1 } });
     const memId = await store(h, embedder, { content: 'dedupe me' });
-    // Manually enqueue a second time as if a bug tried to double-enqueue; existsPending should block it
-    // Actually, test that calling store again for a DIFFERENT content (same id via supersedes) won't double up.
-    // Simpler: check that the idempotency guard in existsPending works by calling the guard directly.
-    // The store path dedupes via existsPending — call store again for the SAME content to see no duplicate.
-    // Since store always inserts a new memory row, we simulate by checking there's still only 1 job for memId.
-    const pending = listRecurring(h).filter(
+    expect(memId).toBe(1);
+    const pending = listActive(h).filter(
       (j) => j.kind === 'reembed_memory' && (JSON.parse(j.payload ?? '{}') as { id: unknown }).id === memId,
     );
-    expect(pending).toHaveLength(1);
-    // Verify existsPending correctly detects the existing job (unit-level check).
-    const { existsPending } = await import('../src/jobs.js');
-    expect(existsPending(h, 'reembed_memory', `"id":${memId}`)).toBe(true);
-    expect(existsPending(h, 'reembed_memory', `"id":99999`)).toBe(false);
+    expect(pending).toHaveLength(1); // not duplicated by store()
   });
 });
