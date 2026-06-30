@@ -89,3 +89,25 @@ export function existsPending(h: DbHandles, kind: string, idValue: number): bool
   ).get(kind, idValue) as { 1: number } | undefined;
   return row !== undefined;
 }
+
+/**
+ * Returns the count of approvals in 'pending' status.
+ * Used by the scheduler sweep gate to decide whether to run.
+ */
+export function countPendingApprovals(h: DbHandles): number {
+  const row = h.raw.prepare(
+    `SELECT COUNT(*) AS n FROM approvals WHERE status='pending'`,
+  ).get() as { n: number };
+  return row.n;
+}
+
+/**
+ * Updates the recurrence expression and next run_at for a recurring job.
+ * Called by seedRecurring when the in-code cron definition changes.
+ */
+export function setRecurrence(h: DbHandles, id: number, recurrence: string, runAt: string): void {
+  const ts = new Date().toISOString();
+  h.raw.prepare(
+    `UPDATE jobs SET recurrence=?, run_at=?, updated_at=? WHERE id=?`,
+  ).run(recurrence, runAt, ts, id);
+}

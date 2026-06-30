@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { enqueue, claimDue, complete, fail, listActive, requeueStale, existsPending } from '../src/jobs.js';
+import { enqueue, claimDue, complete, fail, listActive, requeueStale, existsPending, countPendingApprovals, setRecurrence } from '../src/jobs.js';
+import { GateApprovalStore } from '../src/gate-approval-store.js';
 import { FakeEmbedder } from '../src/embedder.js';
 import { store } from '../src/memory.js';
 
@@ -106,5 +107,39 @@ describe('reembed_memory producer', () => {
       (j) => j.kind === 'reembed_memory' && (JSON.parse(j.payload ?? '{}') as { id: unknown }).id === memId,
     );
     expect(pending).toHaveLength(1); // not duplicated by store()
+  });
+});
+
+describe('countPendingApprovals', () => {
+  it('returns 0 when no approvals exist', () => {
+    expect(countPendingApprovals(h)).toBe(0);
+  });
+
+  it('counts only pending approvals', async () => {
+    const approvalStore = new GateApprovalStore(h);
+    await approvalStore.addPending({ tool: 'bash', target: 'ls', payload: {}, tier: 'ask', tool_use_id: 'tu_1', session_id: null });
+    await approvalStore.addPending({ tool: 'bash', target: 'pwd', payload: {}, tier: 'ask', tool_use_id: 'tu_2', session_id: null });
+    expect(countPendingApprovals(h)).toBe(2);
+    // approve one → should drop from pending count
+    await approvalStore.setDecisionByToolUseId('tu_1', 'approved');
+    expect(countPendingApprovals(h)).toBe(1);
+  });
+});
+
+describe('setRecurrence', () => {
+  it('updates recurrence and run_at on an existing job', () => {
+    const id = enqueue(h, { kind: 'sweep', run_at: '2026-06-30T13:03:00Z', recurrence: '3 13 * * *' });
+    setRecurrence(h, id, '3 13,18 * * *', '2026-06-30T18:03:00Z');
+    const row = listActive(h).find((j) => j.id === id)!;
+    expect(row.recurrence).toBe('3 13,18 * * *');
+    expect(row.run_at).toBe('2026-06-30T18:03:00Z');
+  });
+
+  it('updated_at is bumped after setRecurrence', () => {
+    const before = new Date().toISOString();
+    const id = enqueue(h, { kind: 'sweep', run_at: '2026-06-30T13:03:00Z', recurrence: '3 13 * * *' });
+    setRecurrence(h, id, '3 13,18 * * *', '2026-06-30T18:03:00Z');
+    const row = listActive(h).find((j) => j.id === id)!;
+    expect(row.updated_at >= before).toBe(true);
   });
 });
