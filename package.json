@@ -1,6 +1,6 @@
 {
   "name": "@justfortytwo/memory",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Standalone semantic-memory MCP server (SQLite + sqlite-vec + Ollama embedder). persona-agnostic.",
   "license": "MIT",
   "author": {
