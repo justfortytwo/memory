@@ -19,6 +19,15 @@ import type {
   AddPendingInput,
 } from '@justfortytwo/gate';
 import type { DbHandles } from './db.js';
+import { enqueue, existsPending } from './jobs.js';
+
+/**
+ * Fixed dedup key for notify_pending jobs. Real approval ids are UUIDs (pa_…),
+ * never 0, so payload:{id:0} is safe as a synthetic sentinel. At most ONE
+ * notify_pending job is queued at a time; when the scheduler completes it the
+ * next staged approval re-enqueues.
+ */
+const NOTIFY_PENDING_KEY = 0;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -100,6 +109,12 @@ export class GateApprovalStore implements ApprovalStore, AuditLogger {
         ts,
         ts,
       );
+    // Enqueue a deduped notify_pending job so the scheduler can summarise pending
+    // approvals to the assistant. Best-effort: the approval is already durable;
+    // an enqueue failure must not roll back the staging.
+    if (!existsPending(this.h, 'notify_pending', NOTIFY_PENDING_KEY)) {
+      enqueue(this.h, { kind: 'notify_pending', run_at: new Date().toISOString(), payload: { id: NOTIFY_PENDING_KEY } });
+    }
     return id;
   }
 

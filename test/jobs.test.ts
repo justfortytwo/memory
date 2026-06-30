@@ -126,6 +126,24 @@ describe('countPendingApprovals', () => {
   });
 });
 
+describe('notify_pending producer', () => {
+  it('staging a pending approval enqueues exactly one notify_pending job', async () => {
+    const approvalStore = new GateApprovalStore(h);
+    await approvalStore.addPending({ tool: 'bash', target: 'ls', payload: {}, tier: 'ask', tool_use_id: 'tu_np_1', session_id: null });
+    const jobs = listActive(h).filter((j) => j.kind === 'notify_pending');
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]!.status).toBe('pending');
+  });
+
+  it('staging a second approval does NOT create a second notify_pending job (deduped)', async () => {
+    const approvalStore = new GateApprovalStore(h);
+    await approvalStore.addPending({ tool: 'bash', target: 'ls', payload: {}, tier: 'ask', tool_use_id: 'tu_np_2', session_id: null });
+    await approvalStore.addPending({ tool: 'bash', target: 'pwd', payload: {}, tier: 'ask', tool_use_id: 'tu_np_3', session_id: null });
+    const jobs = listActive(h).filter((j) => j.kind === 'notify_pending');
+    expect(jobs).toHaveLength(1);
+  });
+});
+
 describe('setRecurrence', () => {
   it('updates recurrence and run_at on an existing job', () => {
     const id = enqueue(h, { kind: 'sweep', run_at: '2026-06-30T13:03:00Z', recurrence: '3 13 * * *' });
