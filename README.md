@@ -44,6 +44,12 @@ tools as `mcp__fortytwo-memory__<tool>`:
 | `reindex` | self-heal the doc index from a markdown directory |
 | `export_range` | render a date range of memories to markdown |
 
+On connect, the server also sends usage **instructions** in the MCP `initialize`
+result: when to search vs. store, which search tool fits, how to correct a
+memory with `supersedes`, and `reindex` caveats. Hosts such as Claude Code add
+them to the model's context. The text lives in `src/server.ts`; update it when
+the tool surface changes.
+
 ### Contract version
 
 Consumers depend on the **tool surface**, not the internals. The contract is

@@ -3,6 +3,7 @@ import type { Tool } from '@modelcontextprotocol/sdk/types.js';
 // Wire schema for the generic memory tool surface. Keep in sync with
 // contract.ts (memoryToolContract) — that file is the version-tracked
 // human contract; this file is what the MCP ListTools handler returns.
+// The usage instructions in server.ts describe these tools too; update them alongside.
 export function toolDefinitions(): Tool[] {
   return [
     {

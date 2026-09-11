@@ -1,19 +1,12 @@
 #!/usr/bin/env node
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  ListToolsRequestSchema,
-  CallToolRequestSchema,
-} from '@modelcontextprotocol/sdk/types.js';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdirSync, realpathSync } from 'node:fs';
 import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
 import { FakeEmbedder, OllamaEmbedder, type Embedder } from './embedder.js';
-import { toolDefinitions } from './tools.js';
-import { callTool } from './dispatch.js';
-import { MEMORY_SERVER_ID } from './contract.js';
+import { createServer } from './server.js';
 
 // Public surface re-exports so consumers can `import { ... } from '@justfortytwo/memory'`.
 export * from './contract.js';
@@ -51,20 +44,7 @@ export async function startServer(): Promise<void> {
   const h = openDb(DB_PATH);
   await runMigrations(h.k);
 
-  const server = new Server(
-    { name: MEMORY_SERVER_ID, version: '0.1.0' },
-    { capabilities: { tools: {} } },
-  );
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolDefinitions(),
-  }));
-
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
-    const { name, arguments: args = {} } = req.params;
-    const result = await callTool(h, embedder, name, args as Record<string, unknown>);
-    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
-  });
+  const server = createServer(h, embedder);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
