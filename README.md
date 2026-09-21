@@ -3,7 +3,7 @@
 A standalone **semantic-memory MCP server**. It stores text "memories" with
 free-form provenance and recalls them by meaning (vector search), by keyword
 (FTS5), or by structured filter. Backed by SQLite + [`sqlite-vec`], embeddings
-from a local [Ollama] model.
+from a local [Ollama] model (or an opt-in remote provider).
 
 It is **persona-agnostic**: no journal/persona/approval coupling, just a generic
 memory store and tool surface. It can be used on its own, or as a Claude Code
@@ -88,6 +88,40 @@ If `EMBED_MODEL` is **unset**, the server falls back to a deterministic,
 dependency-free **`FakeEmbedder`** — useful for tests, CI, and first-run smoke
 checks with zero infra. (The vector tables are fixed at 1024-dim; a model with a
 different dimensionality requires a schema change.)
+
+### Other remote providers (opt-in)
+
+Ollama stays the default. To use a remote OpenAI-compatible provider instead, set
+`EMBED_PROVIDER=openai`:
+
+```bash
+EMBED_PROVIDER=openai
+EMBED_MODEL=text-embedding-3-small       # must be in the allowlist below
+EMBED_API_KEY=sk-...                     # optional for self-hosted servers
+EMBED_BASE_URL=https://api.openai.com/v1 # default for OpenAI/Voyage models; required otherwise
+```
+
+Only models that emit (or can be truncated to) **1024 dims** are accepted, because
+the vector tables are fixed at that size. Any other `EMBED_MODEL` fails at startup
+with the accepted list:
+
+| `EMBED_MODEL` | Default `EMBED_BASE_URL` | Notes |
+|---|---|---|
+| `text-embedding-3-small` | `https://api.openai.com/v1` | truncated to 1024 via `dimensions` |
+| `text-embedding-3-large` | `https://api.openai.com/v1` | truncated to 1024 via `dimensions` |
+| `voyage-3-large` | `https://api.voyageai.com/v1` | 1024 by default |
+| `BAAI/bge-m3` | none — set `EMBED_BASE_URL` | self-hosted, e.g. vLLM; 1024 native |
+| `Qwen/Qwen3-Embedding-0.6B` | none — set `EMBED_BASE_URL` | self-hosted, e.g. vLLM; no query instruction prefix is applied |
+
+For self-hosted servers the model must be served under exactly the name above
+(vLLM: `--served-model-name`).
+
+> **Switching models on an existing database:** two models with the same
+> dimension do **not** share a vector space. Vectors already stored by another
+> model are not comparable with new query vectors, and `recall` will not error —
+> it will return plausible but wrong neighbours. Re-embed existing memories
+> (`reembed`) and reindex docs (`reindex`) after switching. New databases are
+> unaffected.
 
 ## Standalone usage
 

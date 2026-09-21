@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, realpathSync } from 'node:fs';
 import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
-import { FakeEmbedder, OllamaEmbedder, type Embedder } from './embedder.js';
+import { embedderFromEnv } from './embedder.js';
 import { createServer } from './server.js';
 
 // Public surface re-exports so consumers can `import { ... } from '@justfortytwo/memory'`.
@@ -34,11 +34,9 @@ export async function startServer(): Promise<void> {
   // Standalone, persona-agnostic: DB_PATH (env) or ./memory.db. No repo-root coupling.
   const DB_PATH = process.env.DB_PATH ? resolve(process.env.DB_PATH) : resolve('memory.db');
 
-  // EMBED_MODEL present → real Ollama embedder; absent → deterministic FakeEmbedder
-  // (lets the server boot with zero infra for tests / first-run smoke checks).
-  const embedder: Embedder = process.env.EMBED_MODEL
-    ? new OllamaEmbedder(process.env.EMBED_MODEL, process.env.OLLAMA_BASE_URL)
-    : new FakeEmbedder();
+  // EMBED_MODEL absent → deterministic FakeEmbedder (zero-infra boot for tests / smoke
+  // checks); otherwise Ollama by default, or a remote provider via EMBED_PROVIDER.
+  const embedder = embedderFromEnv();
 
   mkdirSync(dirname(DB_PATH), { recursive: true });
   const h = openDb(DB_PATH);
