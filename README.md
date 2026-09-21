@@ -119,9 +119,10 @@ For self-hosted servers the model must be served under exactly the name above
 > **Switching models on an existing database:** two models with the same
 > dimension do **not** share a vector space. Vectors already stored by another
 > model are not comparable with new query vectors, and `recall` will not error —
-> it will return plausible but wrong neighbours. Re-embed existing memories
-> (`reembed`) and reindex docs (`reindex`) after switching. New databases are
-> unaffected.
+> it will return plausible but wrong neighbours. Re-embed existing memories with
+> the library's `reembed(h, embedder, id)` (one id at a time; no bulk command or
+> MCP tool is provided) and re-run the `reindex` tool for docs after switching.
+> New databases are unaffected.
 
 ## Standalone usage
 
@@ -132,9 +133,10 @@ npm install @justfortytwo/memory
 **Prerequisites.** Requires **Node.js >= 20**. The package depends on
 [`better-sqlite3`] `^12`, a native module that ships prebuilt binaries for LTS
 Node releases — on an unsupported Node version or platform, `npm install` will
-compile it from source (needs a C/C++ toolchain). It also needs a local (or
-remote) [Ollama] for real embeddings; without `EMBED_MODEL` set it falls back to
-a deterministic `FakeEmbedder` (see [Embedder](#embedder)). `sqlite-vec` ships as
+compile it from source (needs a C/C++ toolchain). It also needs an embedding
+source for real embeddings — a local (or remote) [Ollama], or an opt-in remote
+provider; without `EMBED_MODEL` set it falls back to a deterministic
+`FakeEmbedder` (see [Embedder](#embedder)). `sqlite-vec` ships as
 a bundled npm dependency — no manual SQLite-extension install is needed.
 
 [`better-sqlite3`]: https://github.com/WiseLibs/better-sqlite3
@@ -180,11 +182,13 @@ slash, so either form works — but prefer no trailing slash.
 ### As a library
 
 ```ts
-import { openDb, runMigrations, OllamaEmbedder, store, recall, deleteByIds } from '@justfortytwo/memory';
+import { openDb, runMigrations, OllamaEmbedder, embedderFromEnv, store, recall, deleteByIds } from '@justfortytwo/memory';
 
 const h = openDb('memory.db');
 await runMigrations(h.k);
 const embedder = new OllamaEmbedder();
+// or choose from env exactly like the server does (EMBED_PROVIDER / EMBED_MODEL / ...):
+// const embedder = embedderFromEnv();
 
 await store(h, embedder, { content: 'the deploy script lives in scripts/deploy.sh', source: 'owner', observed: 'stated' });
 const hits = await recall(h, embedder, 'how do I deploy?', 5);
