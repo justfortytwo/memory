@@ -62,3 +62,5 @@ if (invokedAsBin()) {
     process.exit(1);
   });
 }
+
+export { memoryHead, memoryDelta, type MemoryCursor } from './delta.js';

@@ -7,6 +7,7 @@ import * as m001 from './migrations/001_init.js';
 import * as m002 from './migrations/002_fts.js';
 import * as m003 from './migrations/003_approvals.js';
 import * as m004 from './migrations/004_jobs.js';
+import * as m005 from './migrations/005_memory_identity.js';
 
 type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
 
@@ -18,6 +19,7 @@ const MIGRATIONS: Array<{ name: string } & Migration> = [
   { name: '002_fts', up: m002.up, down: m002.down },
   { name: '003_approvals', up: m003.up, down: m003.down },
   { name: '004_jobs', up: m004.up, down: m004.down },
+  { name: '005_memory_identity', up: m005.up, down: m005.down },
 ];
 
 // Safe under concurrent first-open: Telegram and Scheduler (separate OS

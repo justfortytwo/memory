@@ -274,3 +274,12 @@ MIT © 2026 Enrico Deleo
 ---
 
 Created and maintained by [**Enrico Deleo**](https://enricodeleo.com).
+
+## Incremental library reads
+
+`memoryHead(h)` returns `{ database, position }`, using a persistent database
+identity and SQLite's AUTOINCREMENT high watermark (not timestamps or MAX(id)).
+`memoryDelta(h, cursor, limit = 50)` returns ascending insertion pages and the
+last reviewed position; it includes superseded rows as evidence and never skips
+unreturned rows. Deleted ID gaps remain safe. Invalid/foreign/backwards cursors
+fail closed. These are library APIs only; the MCP tool contract is unchanged.

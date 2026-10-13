@@ -52,7 +52,7 @@ describe('runMigrations under concurrent first-open', () => {
     const state = h.raw.prepare('SELECT name FROM _migration_state ORDER BY rowid').all() as Array<{ name: string }>;
     // Each migration recorded exactly once, in order (name is the primary key, so a
     // double-run would have thrown in a child rather than duplicated here).
-    expect(state.map((r) => r.name)).toEqual(['001_init', '002_fts', '003_approvals', '004_jobs']);
+    expect(state.map((r) => r.name)).toEqual(['001_init', '002_fts', '003_approvals', '004_jobs', '005_memory_identity']);
     await h.k.destroy();
     h.raw.close();
   }, 60_000);
