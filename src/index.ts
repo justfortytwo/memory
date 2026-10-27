@@ -23,6 +23,7 @@ export {
 export { enrich, enrichFromTurn, type EnrichmentCandidate, type EnrichmentResult } from './enrichment.js';
 export { enqueue, claimDue, complete, fail, listActive, requeueStale, existsPending, countPendingApprovals, setRecurrence, MAX_ATTEMPTS, type JobRow, type NewJob } from './jobs.js';
 export { toolDefinitions } from './tools.js';
+export { createServer } from './server.js';
 // memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
 export { GateApprovalStore } from './gate-approval-store.js';
 
