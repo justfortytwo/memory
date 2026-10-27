@@ -2,12 +2,14 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
   ListToolsRequestSchema,
   CallToolRequestSchema,
+  type Tool,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { DbHandles } from './db.js';
 import type { Embedder } from './embedder.js';
 import { toolDefinitions } from './tools.js';
 import { callTool } from './dispatch.js';
 import { MEMORY_SERVER_ID } from './contract.js';
+import type { McpExtension } from './extension.js';
 
 // Usage guidance sent in the initialize result; MCP hosts add it to the model's
 // context. Keep in sync with tools.ts and keep it short: some hosts truncate
@@ -40,20 +42,52 @@ const INSTRUCTIONS = [
 
 // Build the MCP server with its handlers wired to an open DB + embedder, WITHOUT
 // connecting a transport. index.ts connects it over stdio; tests connect it over
-// an in-memory transport.
-export function createServer(h: DbHandles, embedder: Embedder): Server {
+// an in-memory transport. Extension tools are appended after memory's; an
+// extension tool whose name collides with an already-listed tool is skipped.
+export function createServer(
+  h: DbHandles,
+  embedder: Embedder,
+  extensions: McpExtension[] = [],
+): Server {
+  const memoryTools = toolDefinitions();
+  const memoryNames = new Set(memoryTools.map((t) => t.name));
+  const taken = new Set(memoryNames);
+  const extTools: Tool[] = [];
+  for (const ext of extensions) {
+    for (const t of ext.tools()) {
+      if (taken.has(t.name)) {
+        process.stderr.write(`fortytwo-memory: extension tool "${t.name}" collides with an existing tool; skipped\n`);
+        continue;
+      }
+      taken.add(t.name);
+      extTools.push(t);
+    }
+  }
+  const instructions = [INSTRUCTIONS, ...extensions.map((e) => e.instructions).filter((i): i is string => !!i)].join('\n\n');
+
   const server = new Server(
     { name: MEMORY_SERVER_ID, version: '0.1.0' },
-    { capabilities: { tools: {} }, instructions: INSTRUCTIONS },
+    { capabilities: { tools: {} }, instructions },
   );
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({
-    tools: toolDefinitions(),
+    tools: [...memoryTools, ...extTools],
   }));
 
   server.setRequestHandler(CallToolRequestSchema, async (req) => {
     const { name, arguments: args = {} } = req.params;
-    const result = await callTool(h, embedder, name, args as Record<string, unknown>);
+    const a = args as Record<string, unknown>;
+    let result: unknown;
+    if (memoryNames.has(name)) {
+      result = await callTool(h, embedder, name, a);
+    } else {
+      const owners = extTools.some((t) => t.name === name) ? extensions : [];
+      for (const ext of owners) {
+        result = await ext.call(name, a);
+        if (result !== undefined) break;
+      }
+      if (result === undefined) throw new Error(`Unknown tool: ${name}`);
+    }
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   });
 

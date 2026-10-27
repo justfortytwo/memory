@@ -7,12 +7,14 @@ import { openDb } from './db.js';
 import { runMigrations } from './migrate.js';
 import { embedderFromEnv } from './embedder.js';
 import { createServer } from './server.js';
+import { loadExtensions } from './extension.js';
 
 // Public surface re-exports so consumers can `import { ... } from '@justfortytwo/memory'`.
 export * from './contract.js';
 export * from './embedder.js';
 export { openDb, type DbHandles, EMBED_DIM } from './db.js';
-export { runMigrations } from './migrate.js';
+export { runMigrations, applyMigrations, type Migration } from './migrate.js';
+export { loadExtensions, type McpExtension } from './extension.js';
 export {
   store, query, recall, recallDocs, lexical, reindex, exportRange, reembed, deleteByIds,
   type MemoryInput, type MemoryRow, type RecallRow, type QueryOpts,
@@ -42,7 +44,12 @@ export async function startServer(): Promise<void> {
   const h = openDb(DB_PATH);
   await runMigrations(h.k);
 
-  const server = createServer(h, embedder);
+  // FORTYTWO_MCP_EXTENSIONS: comma-separated package names exporting createMcpExtension.
+  const names = (process.env['FORTYTWO_MCP_EXTENSIONS'] ?? '')
+    .split(',').map((n) => n.trim()).filter(Boolean);
+  const extensions = await loadExtensions(names, h, embedder);
+
+  const server = createServer(h, embedder, extensions);
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

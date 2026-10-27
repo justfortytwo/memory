@@ -23,7 +23,8 @@ src/
   memory.ts              core ops: store/query/recall/recallDocs/lexical/reindex/exportRange/reembed/deleteByIds
   embedder.ts            Embedder interface, FakeEmbedder, OllamaEmbedder, OpenAICompatEmbedder, embedderFromEnv
   db.ts                  openDb(): raw better-sqlite3 handle (+ sqlite-vec, vec0 tables) and a knex handle; EMBED_DIM=1024
-  migrate.ts             runMigrations() with a static migration list; also the `npm run migrate` entry
+  extension.ts           McpExtension seam + loadExtensions() (FORTYTWO_MCP_EXTENSIONS)
+  migrate.ts             runMigrations()/applyMigrations() with a static migration list; also the `npm run migrate` entry
   migrations/00N_*.ts    001_init, 002_fts, 003_approvals, 004_jobs
   enrichment.ts          enrich / enrichFromTurn (dedupe + write; salience extractor is injected)
   jobs.ts                durable jobs queue (enqueue/claimDue/complete/fail/requeueStale/...) used by scheduler
@@ -47,6 +48,8 @@ There is no lint or format script. Node >= 20. `prepublishOnly` runs the build.
 ## Environment
 
 See `.env.example`. `DB_PATH` (default `./memory.db`), `EMBED_MODEL` (unset = FakeEmbedder),
+`FORTYTWO_MCP_EXTENSIONS` (comma-separated package names; each must export
+`createMcpExtension(h, embedder)`; load failures are logged to stderr and skipped),
 `OLLAMA_BASE_URL` (default `http://localhost:11434`), `EMBED_PROVIDER` (`ollama` | `openai`),
 `EMBED_API_KEY`, `EMBED_BASE_URL`. Never commit `.env` or `*.db` (gitignored).
 
@@ -67,6 +70,9 @@ See `.env.example`. `DB_PATH` (default `./memory.db`), `EMBED_MODEL` (unset = Fa
   (`memoryToolContract`), and the `INSTRUCTIONS` text in `src/server.ts` (keep it short; hosts
   may truncate). Breaking change to a tool name, required input, or result shape => bump
   `MEMORY_TOOL_CONTRACT_VERSION`. Additive changes do not bump it.
+- Extension tools (via `McpExtension`) are appended after memory's and are **outside**
+  `memoryToolContract`; they never bump `MEMORY_TOOL_CONTRACT_VERSION`. Name collisions with
+  memory tools are skipped. Memory must never import an extension package.
 - Server id is `fortytwo-memory`; consumers call `mcp__fortytwo-memory__<tool>`.
 - **Two DB handles.** vec0 virtual tables (`memory_vec`, `doc_vec`) are created on the raw
   handle in `openDb()` because sqlite-vec is loaded only there; knex migrations cannot create

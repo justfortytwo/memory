@@ -9,12 +9,16 @@ import * as m003 from './migrations/003_approvals.js';
 import * as m004 from './migrations/004_jobs.js';
 import * as m005 from './migrations/005_memory_identity.js';
 
-type Migration = { up(k: Knex): Promise<void>; down(k: Knex): Promise<void> };
+export type Migration = {
+  name: string;
+  up(k: Knex): Promise<void>;
+  down(k: Knex): Promise<void>;
+};
 
 // Static import list — deterministic under both vitest (resolves .js → .ts) and
 // the built server (dist/migrations/*.js). No knex CLI, no dynamic-import path
 // fragility.
-const MIGRATIONS: Array<{ name: string } & Migration> = [
+const MIGRATIONS: Migration[] = [
   { name: '001_init', up: m001.up, down: m001.down },
   { name: '002_fts', up: m002.up, down: m002.down },
   { name: '003_approvals', up: m003.up, down: m003.down },
@@ -41,6 +45,12 @@ const MIGRATIONS: Array<{ name: string } & Migration> = [
 // `_migration_lock` itself is created by a single autocommit statement, which
 // SQLite runs under the write lock and re-checks after a concurrent schema change.
 export async function runMigrations(k: Knex): Promise<void> {
+  await applyMigrations(k, MIGRATIONS);
+}
+
+// Same locked, transactional loop for any migration list, so sibling packages
+// (e.g. transcript) can share `_migration_state` without a second mechanism.
+export async function applyMigrations(k: Knex, migrations: Migration[]): Promise<void> {
   await k.raw(
     `CREATE TABLE IF NOT EXISTS _migration_lock (
        id integer primary key check (id = 1),
@@ -60,7 +70,7 @@ export async function runMigrations(k: Knex): Promise<void> {
     );
     const rows = (await trx.raw('SELECT name FROM _migration_state')) as Array<{ name: string }>;
     const done = new Set((Array.isArray(rows) ? rows : []).map((r) => r.name));
-    for (const m of MIGRATIONS) {
+    for (const m of migrations) {
       if (done.has(m.name)) continue;
       await m.up(trx);
       await trx.raw('INSERT INTO _migration_state (name) VALUES (?)', [m.name]);
