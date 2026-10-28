@@ -8,8 +8,9 @@ A standalone, persona-agnostic **semantic-memory MCP server** (npm: `@justfortyt
 bin `fortytwo-memory`). It stores text memories with free-form provenance and recalls them
 semantically (sqlite-vec), lexically (FTS5), or by structured filter. Storage is SQLite via
 `better-sqlite3` + `knex`. Embeddings come from Ollama by default, an opt-in OpenAI-compatible
-provider, or a deterministic `FakeEmbedder` when `EMBED_MODEL` is unset. It is also a Claude Code
-plugin (`.claude-plugin/plugin.json` + `.mcp.json`) and a library imported by sibling packages.
+provider, or a deterministic `FakeEmbedder` when `EMBED_MODEL` is unset. It is also a library
+imported by sibling packages. It is not a Claude Code plugin: `@justfortytwo/installer` registers it in
+the project's `.mcp.json`.
 
 ## Layout
 
@@ -101,7 +102,6 @@ See `.env.example`. `DB_PATH` (default `./memory.db`), `EMBED_MODEL` (unset = Fa
 - `better-sqlite3` is native; unsupported Node/platform combos compile from source.
 - README mentions `RUN_OLLAMA_TESTS=1` for a live-Ollama test, but no test in `test/` currently
   reads that variable.
-- `.claude-plugin/plugin.json` version (0.1.0) is independent of `package.json` version.
 
 ## Sibling repos (`../`)
 

@@ -6,8 +6,8 @@ free-form provenance and recalls them by meaning (vector search), by keyword
 from a local [Ollama] model (or an opt-in remote provider).
 
 It is **persona-agnostic**: no journal/persona/approval coupling, just a generic
-memory store and tool surface. It can be used on its own, or as a Claude Code
-plugin.
+memory store and tool surface. Use it on its own, or through
+`@justfortytwo/installer`, which registers it in your project's `.mcp.json`.
 
 [`sqlite-vec`]: https://github.com/asg017/sqlite-vec
 [Ollama]: https://ollama.com
@@ -157,7 +157,7 @@ The `bin` is `fortytwo-memory` → `dist/index.js`. You can also run it with
 
 ### Register in your own `.mcp.json`
 
-To use the server in any MCP host (not as a Claude Code plugin), drop this into
+To use the server in any MCP host, drop this into
 your project's `.mcp.json` with a real DB path:
 
 ```json
@@ -204,32 +204,6 @@ a **library API and NOT an MCP tool**: deletion is an owner-privileged operation
 and exposing it to the assistant's turn loop would let prompt-injected content
 trick it into erasing memories. Selecting *which* ids to remove (by query, tag,
 date range, …) is the caller's job — see `@justfortytwo/installer`'s `forget`.
-
-## As a Claude Code plugin
-
-`.claude-plugin/plugin.json` declares the plugin; `.mcp.json` registers the
-`fortytwo-memory` server. By default it launches via `npx`:
-
-```jsonc
-{
-  "mcpServers": {
-    "fortytwo-memory": {
-      "command": "npx",
-      "args": ["-y", "@justfortytwo/memory"],
-      "env": {
-        "OLLAMA_BASE_URL": "http://localhost:11434",
-        "EMBED_MODEL": "qwen3-embedding:0.6b",
-        "DB_PATH": "${CLAUDE_PLUGIN_DATA}/memory.db"
-      }
-    }
-  }
-}
-```
-
-`${CLAUDE_PLUGIN_DATA}` survives plugin updates, so the DB persists across
-upgrades. When developing from source, build first (`npm run build`) and swap
-the command to `node` with args `["${CLAUDE_PLUGIN_ROOT}/dist/index.js"]`.
-Claude Code does **not** build MCP servers — they run via npm/npx.
 
 ## Continuous enrichment
 

@@ -9,7 +9,7 @@
 //   - Additive changes (new optional inputs, new tools) do NOT bump the version.
 //
 // The MCP tools are namespaced by the registered server id "fortytwo-memory"
-// (see .mcp.json), so a consumer calls them as `mcp__fortytwo-memory__<tool>`.
+// (written to the project's .mcp.json by the installer), so a consumer calls them as `mcp__fortytwo-memory__<tool>`.
 // ---------------------------------------------------------------------------
 
 /** Bump on any breaking change to the tool surface below. */
