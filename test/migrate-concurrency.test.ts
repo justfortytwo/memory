@@ -46,13 +46,13 @@ describe('runMigrations under concurrent first-open', () => {
     const h = openDb(dbPath);
     await runMigrations(h.k);
     const names = (h.raw.prepare("SELECT name FROM sqlite_master WHERE type IN ('table','trigger')").all() as Array<{ name: string }>).map((r) => r.name);
-    for (const t of ['_migration_lock', '_migration_state', 'memories', 'index_state', 'memory_fts', 'memory_ai', 'memory_ad', 'memory_au', 'memory_vec', 'doc_vec', 'approvals', 'audit_log', 'jobs']) {
+    for (const t of ['_migration_lock', '_migration_state', 'memories', 'index_state', 'memory_fts', 'memory_ai', 'memory_ad', 'memory_au', 'memory_vec', 'doc_vec', 'approvals', 'audit_log']) {
       expect(names).toContain(t);
     }
     const state = h.raw.prepare('SELECT name FROM _migration_state ORDER BY rowid').all() as Array<{ name: string }>;
     // Each migration recorded exactly once, in order (name is the primary key, so a
     // double-run would have thrown in a child rather than duplicated here).
-    expect(state.map((r) => r.name)).toEqual(['001_init', '002_fts', '003_approvals', '004_jobs', '005_memory_identity', '006_approvals_notified_at']);
+    expect(state.map((r) => r.name)).toEqual(['001_init', '002_fts', '003_approvals', '005_memory_identity', '006_approvals_notified_at']);
     await h.k.destroy();
     h.raw.close();
   }, 60_000);

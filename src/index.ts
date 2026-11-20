@@ -21,13 +21,14 @@ export {
   type DocRecallRow, type ReindexResult,
 } from './memory.js';
 export { enrich, enrichFromTurn, type EnrichmentCandidate, type EnrichmentResult } from './enrichment.js';
-export { enqueue, claimDue, complete, fail, listActive, requeueStale, existsPending, countPendingApprovals, setRecurrence, MAX_ATTEMPTS, type JobRow, type NewJob } from './jobs.js';
 export { toolDefinitions } from './tools.js';
 export { createServer } from './server.js';
 // memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
 export { GateApprovalStore } from './gate-approval-store.js';
 // Approval outbox: the scheduler polls un-notified approvals and stamps them.
 export { listUnnotifiedApprovals, markApprovalsNotified, type UnnotifiedApproval } from './gate-approval-store.js';
+// Approvals read by the scheduler's sweep gate (memory owns the approvals table).
+export { countPendingApprovals } from './gate-approval-store.js';
 
 /**
  * Boot the MCP server over stdio. Kept behind an entrypoint guard so that

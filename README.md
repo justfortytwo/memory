@@ -196,6 +196,11 @@ const hits = await recall(h, embedder, 'how do I deploy?', 5);
 deleteByIds(h, [hits[0].id]); // hard-delete (row + vector + FTS); returns the count removed
 ```
 
+The durable jobs queue is not part of memory. The `jobs` table (migration
+`004_jobs`) and the job API (`enqueue`, `claimDue`, ...) belong to
+`@justfortytwo/scheduler`, which runs its migration on this DB handle through
+`applyMigrations`, into the same `_migration_state`.
+
 ### Deleting memories
 
 `deleteByIds(h, ids)` hard-deletes memories — the row, its vector, and its FTS
@@ -231,6 +236,8 @@ peers, no cycle):
   Staging an approval queues no job: the row is an outbox. A host (the
   scheduler) polls `listUnnotifiedApprovals(h)`, notifies the owner, then calls
   `markApprovalsNotified(h, ids, at)` to stamp `notified_at`.
+  `countPendingApprovals(h)` (the scheduler's `sweep` gate) also lives here,
+  because memory owns the `approvals` table.
 - **`@justfortytwo/salience`** — the model-driven salience extractor injected
   into `enrichFromTurn` (see above).
 

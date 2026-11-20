@@ -197,3 +197,14 @@ export function markApprovalsNotified(h: DbHandles, ids: string[], at: string): 
   });
   return txn(ids);
 }
+
+/**
+ * Number of approvals in 'pending' status. Memory owns the `approvals` table,
+ * so this query stays here; the scheduler's `sweep` gate calls it.
+ */
+export function countPendingApprovals(h: DbHandles): number {
+  const row = h.raw.prepare(
+    `SELECT COUNT(*) AS n FROM approvals WHERE status='pending'`,
+  ).get() as { n: number };
+  return row.n;
+}
