@@ -228,6 +228,9 @@ peers, no cycle):
   gate's `ApprovalStore` + `AuditLogger` interfaces. Pass it to gate's
   `decide(..., { store, audit })` to back the safety gate's one-shot approvals
   with memory's db instead of the gate's standalone JSONL store.
+  Staging an approval queues no job: the row is an outbox. A host (the
+  scheduler) polls `listUnnotifiedApprovals(h)`, notifies the owner, then calls
+  `markApprovalsNotified(h, ids, at)` to stamp `notified_at`.
 - **`@justfortytwo/salience`** — the model-driven salience extractor injected
   into `enrichFromTurn` (see above).
 

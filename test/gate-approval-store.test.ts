@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { GateApprovalStore } from '../src/gate-approval-store.js';
+import { GateApprovalStore, listUnnotifiedApprovals, markApprovalsNotified } from '../src/gate-approval-store.js';
 
 let dir: string;
 let h: DbHandles;
@@ -84,5 +84,59 @@ describe('GateApprovalStore', () => {
     const rows = h.raw.prepare('SELECT actor, kind, approval_status FROM audit_log').all();
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ actor: 'agent', kind: 'approval_request', approval_status: 'pending' });
+  });
+});
+
+describe('approval notification outbox (notified_at)', () => {
+  it('006 adds a nullable notified_at column to approvals', async () => {
+    expect(await h.k.schema.hasColumn('approvals', 'notified_at')).toBe(true);
+  });
+
+  it('a staged approval is listed until it is stamped, then no longer', async () => {
+    const id = await store.addPending(pending);
+    expect(listUnnotifiedApprovals(h).map((a) => a.id)).toEqual([id]);
+    expect(markApprovalsNotified(h, [id], '2026-11-20T10:00:00.000Z')).toBe(1);
+    expect(listUnnotifiedApprovals(h)).toEqual([]);
+    const row = h.raw.prepare('SELECT notified_at FROM approvals WHERE id = ?').get(id) as { notified_at: string };
+    expect(row.notified_at).toBe('2026-11-20T10:00:00.000Z');
+  });
+
+  it('stamping is idempotent: an already-stamped row keeps its first stamp', async () => {
+    const id = await store.addPending(pending);
+    markApprovalsNotified(h, [id], '2026-11-20T10:00:00.000Z');
+    expect(markApprovalsNotified(h, [id], '2026-11-20T11:00:00.000Z')).toBe(0);
+    const row = h.raw.prepare('SELECT notified_at FROM approvals WHERE id = ?').get(id) as { notified_at: string };
+    expect(row.notified_at).toBe('2026-11-20T10:00:00.000Z');
+  });
+
+  it('only pending approvals are listed', async () => {
+    await store.addPending(pending);
+    await store.setDecisionByToolUseId('tu_1', 'approved');
+    expect(listUnnotifiedApprovals(h)).toEqual([]);
+  });
+
+  it('re-staging the same tool_use_id resets notified_at to NULL', async () => {
+    const first = await store.addPending(pending);
+    markApprovalsNotified(h, [first], '2026-11-20T10:00:00.000Z');
+    await store.setDecisionByToolUseId('tu_1', 'denied');
+    const second = await store.addPending(pending);
+    expect(listUnnotifiedApprovals(h).map((a) => a.id)).toEqual([second]);
+  });
+
+  it('a row re-staged after it was listed is not stamped by the stale id', async () => {
+    const listed = await store.addPending(pending);
+    const ids = listUnnotifiedApprovals(h).map((a) => a.id);
+    expect(ids).toEqual([listed]);
+    const restaged = await store.addPending(pending); // same tool_use_id, new id, while a notify is in flight
+    expect(markApprovalsNotified(h, ids, '2026-11-20T10:00:00.000Z')).toBe(0);
+    expect(listUnnotifiedApprovals(h).map((a) => a.id)).toEqual([restaged]);
+  });
+
+  it('an approval staged while a notify is in flight stays listed for the next poll', async () => {
+    await store.addPending(pending);
+    const inFlight = listUnnotifiedApprovals(h).map((a) => a.id);
+    const late = await store.addPending({ ...pending, tool_use_id: 'tu_late' });
+    markApprovalsNotified(h, inFlight, '2026-11-20T10:00:00.000Z');
+    expect(listUnnotifiedApprovals(h).map((a) => a.id)).toEqual([late]);
   });
 });

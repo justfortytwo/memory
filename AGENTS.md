@@ -26,10 +26,11 @@ src/
   db.ts                  openDb(): raw better-sqlite3 handle (+ sqlite-vec, vec0 tables) and a knex handle; EMBED_DIM=1024
   extension.ts           McpExtension seam + loadExtensions() (FORTYTWO_MCP_EXTENSIONS)
   migrate.ts             runMigrations()/applyMigrations() with a static migration list; also the `npm run migrate` entry
-  migrations/00N_*.ts    001_init, 002_fts, 003_approvals, 004_jobs
+  migrations/00N_*.ts    001_init, 002_fts, 003_approvals, 004_jobs, 005_memory_identity, 006_approvals_notified_at
   enrichment.ts          enrich / enrichFromTurn (dedupe + write; salience extractor is injected)
   jobs.ts                durable jobs queue (enqueue/claimDue/complete/fail/requeueStale/...) used by scheduler
   gate-approval-store.ts GateApprovalStore: SQLite impl of @justfortytwo/gate's ApprovalStore + AuditLogger
+                         + approval outbox (listUnnotifiedApprovals / markApprovalsNotified)
 test/*.test.ts           vitest suites (one per module, plus gate-seam cross-package test)
 .github/workflows/ci.yml calls the shared justfortytwo/.github node-ci.yml workflow with siblings: "gate"
 ```
@@ -88,6 +89,10 @@ See `.env.example`. `DB_PATH` (default `./memory.db`), `EMBED_MODEL` (unset = Fa
 - Vector dimension is fixed at 1024 (`EMBED_DIM`). Remote models are restricted to a
   1024-dim allowlist in `embedder.ts`. Switching models on an existing DB silently degrades
   recall until memories are re-embedded (`reembed`) and docs re-`reindex`ed.
+- **Memory produces no jobs.** `store()` embeds in its own transaction and queues nothing;
+  `addPending` leaves `approvals.notified_at` NULL (reset on a re-request) and the scheduler
+  polls `listUnnotifiedApprovals`, notifies, then calls `markApprovalsNotified`. Do not call
+  `enqueue` from memory code (the jobs API is still exported for scheduler/telegram).
 - Enrichment owns only dedupe + write; the model-driven salience extractor is injected
   (from `@justfortytwo/salience`).
 

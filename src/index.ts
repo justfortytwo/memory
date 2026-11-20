@@ -26,6 +26,8 @@ export { toolDefinitions } from './tools.js';
 export { createServer } from './server.js';
 // memory's implementation of gate's ApprovalStore + AuditLogger seam (memory -> gate).
 export { GateApprovalStore } from './gate-approval-store.js';
+// Approval outbox: the scheduler polls un-notified approvals and stamps them.
+export { listUnnotifiedApprovals, markApprovalsNotified, type UnnotifiedApproval } from './gate-approval-store.js';
 
 /**
  * Boot the MCP server over stdio. Kept behind an entrypoint guard so that
