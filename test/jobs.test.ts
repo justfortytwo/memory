@@ -79,34 +79,13 @@ describe('existsPending (exact json_extract match)', () => {
   });
 });
 
-describe('reembed_memory producer', () => {
-  it('store() enqueues exactly one pending reembed_memory job carrying the memory id', async () => {
+describe('store() produces no jobs', () => {
+  it('store() embeds the memory in the same write and enqueues nothing', async () => {
     const embedder = new FakeEmbedder();
     const memId = await store(h, embedder, { content: 'hello scheduler' });
-    const jobs = listActive(h).filter((j) => j.kind === 'reembed_memory');
-    expect(jobs).toHaveLength(1);
-    const payload = JSON.parse(jobs[0]!.payload ?? '{}') as { id: unknown };
-    expect(payload.id).toBe(memId);
-  });
-
-  it('a second store() for a different memory creates a second job', async () => {
-    const embedder = new FakeEmbedder();
-    await store(h, embedder, { content: 'first' });
-    await store(h, embedder, { content: 'second' });
-    const jobs = listActive(h).filter((j) => j.kind === 'reembed_memory');
-    expect(jobs).toHaveLength(2);
-  });
-
-  it('store() dedupes: a pre-existing pending reembed for that id blocks a second enqueue', async () => {
-    const embedder = new FakeEmbedder();
-    // The next memory row will be id 1 (fresh db). Pre-seed its reembed job.
-    enqueue(h, { kind: 'reembed_memory', run_at: '2020-01-01T00:00:00Z', payload: { id: 1 } });
-    const memId = await store(h, embedder, { content: 'dedupe me' });
-    expect(memId).toBe(1);
-    const pending = listActive(h).filter(
-      (j) => j.kind === 'reembed_memory' && (JSON.parse(j.payload ?? '{}') as { id: unknown }).id === memId,
-    );
-    expect(pending).toHaveLength(1); // not duplicated by store()
+    expect(listActive(h)).toEqual([]);
+    const vec = h.raw.prepare('SELECT rowid FROM memory_vec WHERE rowid = ?').get(BigInt(memId)) as { rowid: number } | undefined;
+    expect(vec).toBeDefined();
   });
 });
 
