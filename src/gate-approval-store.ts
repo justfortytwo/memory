@@ -19,15 +19,6 @@ import type {
   AddPendingInput,
 } from '@justfortytwo/gate';
 import type { DbHandles } from './db.js';
-import { enqueue, existsPending } from './jobs.js';
-
-/**
- * Fixed dedup key for notify_pending jobs. Real approval ids are UUIDs (pa_…),
- * never 0, so payload:{id:0} is safe as a synthetic sentinel. At most ONE
- * notify_pending job is queued at a time; when the scheduler completes it the
- * next staged approval re-enqueues.
- */
-const NOTIFY_PENDING_KEY = 0;
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -95,7 +86,7 @@ export class GateApprovalStore implements ApprovalStore, AuditLogger {
          ON CONFLICT(tool_use_id) DO UPDATE SET
            id = excluded.id, tool = excluded.tool, target = excluded.target,
            payload = excluded.payload, tier = excluded.tier, session_id = excluded.session_id,
-           status = 'pending', decided_by = NULL,
+           status = 'pending', decided_by = NULL, notified_at = NULL,
            created_at = excluded.created_at, updated_at = excluded.updated_at`,
       )
       .run(
@@ -109,12 +100,8 @@ export class GateApprovalStore implements ApprovalStore, AuditLogger {
         ts,
         ts,
       );
-    // Enqueue a deduped notify_pending job so the scheduler can summarise pending
-    // approvals to the assistant. Best-effort: the approval is already durable;
-    // an enqueue failure must not roll back the staging.
-    if (!existsPending(this.h, 'notify_pending', NOTIFY_PENDING_KEY)) {
-      enqueue(this.h, { kind: 'notify_pending', run_at: new Date().toISOString(), payload: { id: NOTIFY_PENDING_KEY } });
-    }
+    // The row is the outbox: notified_at is NULL (reset on a re-request) and the
+    // scheduler polls for such rows (listUnnotifiedApprovals). Memory queues no job.
     return id;
   }
 
@@ -168,4 +155,45 @@ export class GateApprovalStore implements ApprovalStore, AuditLogger {
       )
       .run(entry.actor, entry.kind, entry.content, entry.approval_status ?? null, JSON.stringify(entry.meta ?? {}));
   }
+}
+
+/** A staged approval the owner has not been notified about yet. */
+export interface UnnotifiedApproval {
+  id: string;
+  tool: string;
+  target: string;
+  tier: string;
+  created_at: string;
+}
+
+/**
+ * Pending approvals not yet notified (`notified_at IS NULL`), oldest first. The
+ * scheduler polls this, notifies the owner, then calls `markApprovalsNotified`.
+ * Memory never pushes: it only exposes the state.
+ */
+export function listUnnotifiedApprovals(h: DbHandles): UnnotifiedApproval[] {
+  return h.raw
+    .prepare(
+      `SELECT id, tool, target, tier, created_at FROM approvals
+        WHERE status = 'pending' AND notified_at IS NULL
+        ORDER BY created_at ASC, id ASC`,
+    )
+    .all() as UnnotifiedApproval[];
+}
+
+/**
+ * Stamp `notified_at` on the given approval ids, only where it is still NULL.
+ * Keyed on `id`, which `addPending` replaces on a re-request, so a row staged
+ * again after it was listed keeps NULL and is notified on the next poll.
+ * Returns the number of rows stamped.
+ */
+export function markApprovalsNotified(h: DbHandles, ids: string[], at: string): number {
+  if (ids.length === 0) return 0;
+  const stamp = h.raw.prepare(`UPDATE approvals SET notified_at = ? WHERE id = ? AND notified_at IS NULL`);
+  const txn = h.raw.transaction((rows: string[]) => {
+    let n = 0;
+    for (const id of rows) n += stamp.run(at, id).changes;
+    return n;
+  });
+  return txn(ids);
 }
