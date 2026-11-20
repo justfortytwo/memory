@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openDb, type DbHandles } from '../src/db.js';
 import { runMigrations } from '../src/migrate.js';
-import { GateApprovalStore, listUnnotifiedApprovals, markApprovalsNotified } from '../src/gate-approval-store.js';
+import { GateApprovalStore, countPendingApprovals, listUnnotifiedApprovals, markApprovalsNotified } from '../src/gate-approval-store.js';
 
 let dir: string;
 let h: DbHandles;
@@ -138,5 +138,20 @@ describe('approval notification outbox (notified_at)', () => {
     const late = await store.addPending({ ...pending, tool_use_id: 'tu_late' });
     markApprovalsNotified(h, inFlight, '2026-11-20T10:00:00.000Z');
     expect(listUnnotifiedApprovals(h).map((a) => a.id)).toEqual([late]);
+  });
+});
+
+describe('countPendingApprovals', () => {
+  it('returns 0 when no approvals exist', () => {
+    expect(countPendingApprovals(h)).toBe(0);
+  });
+
+  it('counts only pending approvals', async () => {
+    await store.addPending({ tool: 'bash', target: 'ls', payload: {}, tier: 'ask', tool_use_id: 'tu_c1', session_id: null });
+    await store.addPending({ tool: 'bash', target: 'pwd', payload: {}, tier: 'ask', tool_use_id: 'tu_c2', session_id: null });
+    expect(countPendingApprovals(h)).toBe(2);
+    // approve one → should drop from pending count
+    await store.setDecisionByToolUseId('tu_c1', 'approved');
+    expect(countPendingApprovals(h)).toBe(1);
   });
 });
